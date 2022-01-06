@@ -24,7 +24,7 @@ Nebula drives come with a handful of useful features like:
 ## Installation
 
 ```js
-npm i @telios/nebula-drive
+npm i @telios/nebula
 ```
 
 ## Usage
