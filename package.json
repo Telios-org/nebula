@@ -1,0 +1,86 @@
+{
+  "name": "@telios/nebula-drive",
+  "version": "5.3.1",
+  "description": "Real-time distributed file and data storage.",
+  "main": "index.js",
+  "scripts": {
+    "test": "cross-env NODE_ENV=test_sdk tape tests/*.test.js | tap-spec",
+    "semantic-release": "semantic-release",
+    "commit": "cz",
+    "debug": "cross-env NODE_ENV=test_sdk tape tests/drive.test.js | tap-spec --nolazy --debug-brk=5858"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Telios-org/nebula-drive.git"
+  },
+  "author": "Hexadecibal",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Telios-org/nebula-drive/issues"
+  },
+  "homepage": "https://github.com/Telios-org/nebula-drive",
+  "dependencies": {
+    "autobase": "1.0.0-alpha.5",
+    "blakejs": "^1.1.0",
+    "chokidar": "^3.5.1",
+    "codecs": "^2.2.0",
+    "concat-stream": "^2.0.0",
+    "corestore": "^6.0.1-alpha.8",
+    "dat-encoding": "^5.0.1",
+    "hyperbee": "^1.6.3",
+    "hypercore": "10.0.0-alpha.19",
+    "hyperswarm": "^3.0.1",
+    "is-online": "^9.0.1",
+    "memorystream": "^0.3.1",
+    "natural": "^5.1.11",
+    "pump": "^3.0.0",
+    "random-access-memory": "^3.1.1",
+    "sodium-native": "^3.2.0",
+    "stopwords": "^0.0.9",
+    "uuid": "^8.2.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^12.0.1",
+    "@commitlint/config-conventional": "^12.0.1",
+    "@semantic-release/git": "^9.0.0",
+    "@semantic-release/gitlab": "^6.0.9",
+    "@semantic-release/npm": "^7.1.0",
+    "cross-env": "^7.0.3",
+    "cz-conventional-changelog": "^3.0.1",
+    "del": "^6.0.0",
+    "husky": "^6.0.0",
+    "semantic-release": "^17.4.2",
+    "tap-spec": "^2.2.2",
+    "tape": "^5.2.2",
+    "tape-promise": "^4.0.0"
+  },
+  "directories": {
+    "lib": "lib",
+    "test": "tests"
+  },
+  "keywords": [
+    "telios",
+    "decentralized",
+    "distributed",
+    "file",
+    "sharing",
+    "drive",
+    "storage",
+    "p2p",
+    "peer-to-peer",
+    "hypercore",
+    "hypercore-protocol",
+    "hyperdrive",
+    "hyperswarm"
+  ],
+  "husky": {
+    "hooks": {
+      "prepare-commit-msg": "exec < /dev/tty && git cz --hook || true"
+    }
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  }
+}
