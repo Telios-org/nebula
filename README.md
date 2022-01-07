@@ -17,9 +17,9 @@ Nebula drives come with a handful of useful features like:
 - [x] Create and share key value databases between peers
 - [x] Upgrade multiwriter to Hypercore v10
 - [x] Build full text search indexes from encrypted Hypercores
+- [x] Upgrade collections API with [Hyperbeedeebee](https://github.com/RangerMauve/hyperbeedeebee)
 - [ ] Upgrade access control to limit sharing by a peer's public key
 - [ ] Turn an existing directory into a drive and watch for changes
-- [ ] Upgrade collections API with [Hyperbeedeebee](https://github.com/RangerMauve/hyperbeedeebee)
 
 ## Installation
 
@@ -85,32 +85,26 @@ await remoteDrive.writeFile('/dest/path/on/drive/someEncryptedFile.json', readab
 
 const corpus = [
   {
-    id: 'p1',
     title: 'Painting 1',
     text_body: "In your world you can create anything you desire."
   },
   {
-    id: 'p2',
     title: 'Painting 2',
     text_body: "I thought today we would make a happy little stream that's just running through the woods here."
   },
   {
-    id: 'p3',
     title: 'Painting 3',
     text_body: "See. We take the corner of the brush and let it play back-and-forth. No pressure. Just relax and watch it happen."
   },
   {
-    id: 'p4',
     title: 'Painting 4',
     text_body: "Just go back and put one little more happy tree in there. Without washing the brush, I'm gonna go right into some Van Dyke Brown."
   },
   {
-    id: 'p5',
     title: 'Painting 5',
     text_body: "Trees get lonely too, so we'll give him a little friend. If what you're doing doesn't make you happy - you're doing the wrong thing."
   },
   {
-    id: 'p6',
     title: 'Painting 6',
     text_body: "Son of a gun. We're not trying to teach you a thing to copy. We're just here to teach you a technique, then let you loose into the world."
   }
@@ -119,19 +113,8 @@ const corpus = [
 const collection = await drive.db.collection('BobRoss')
 
 for(const data of corpus) {
-  await collection.put(data.id, { title: data.title, text_body: data.text_body })
+  await collection.insert({ title: data.title, text_body: data.text_body })
 }
-
-const doc = await collection.get('p4')
-
-// doc
-// {
-//   key: 'p4'
-//   value: {
-//     title: 'Painting 4',
-//     text_body: "Just go back and put one little more happy tree in there. Without washing the brush, I'm gonna go right into some Van Dyke Brown."
-//   }
-// }
 
 // Build a search index from the title and text_body properties
 await collection.ftsIndex(['title', 'text_body'])
@@ -354,22 +337,40 @@ Returns:
   - `drive`: true|false
 
 ## Drive Database API
+Drive databases mimic the MongoDB API. Full API documentation can be found on [Hyperbeedeebee](https://github.com/RangerMauve/hyperbeedeebee)
 
 #### `const collection = await drive.db.collection(name)`
 
-Creates a new key value collection. Collections are encrypted with the drive's `encryptionKey` (`drive.encryptionKey`) when the key is passed in during initialization.
+Creates a new collection. Collections are automatically encrypted when a drive is instantiated with `encryptionKey` (`drive.encryptionKey`) 
 
-#### `await collection.put(key, value)`
+#### `await collection.insert(doc)`
 
-Inserts a new document into the collection. Value should be a JSON object.
+Inserts a new document into the collection.
 
-#### `await collection.get(key)`
+Example:
+```js
+const doc = await collection.insert({ name: 'alice', age: 37 })
 
-Get a document by it's key
+// doc._id gets set to an ObjectId if you don't specify it
+```
 
-#### `await collection.del(key)`
+#### `await collection.find(query)`
 
-Deletes a document by it's key
+Search through all documents by query
+
+Example:
+```js
+const docs = await collection.find({ name: 'alice' })
+```
+
+#### `await collection.createIndex(fields, [opts])`
+
+Creates an index for a set of fields. This will speed up queries and is required for sorting by fields
+
+Example:
+```js
+const docs = await collection.createIndex(['name','address'])
+```
 
 #### `await collection.ftsIndex([prop1, prop2, ...])`
 

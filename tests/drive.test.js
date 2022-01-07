@@ -5,16 +5,9 @@ const fs = require('fs')
 const path = require('path')
 const del = require('del')
 const Drive = require('..')
-const EventEmitter = require('events')
 const DHT = require('@hyperswarm/dht')
 const ram = require('random-access-memory')
 
-// const { signingKeypair } = Account.makeKeys()
-
-// const keyPair  = {
-//   publicKey: Buffer.from(signingKeypair.publicKey, 'hex'),
-//   secretKey: Buffer.from(signingKeypair.privateKey, 'hex')
-// }
 const keyPair = DHT.keyPair()
 const keyPair2 = DHT.keyPair()
 const keyPair3 = DHT.keyPair()
@@ -107,7 +100,6 @@ test('Drive - Create Seed Peer', async t => {
   })
 
   await drive2.ready()
-  // await drive2.addPeer(drive.publicKey)
 
   drive2.on('file-sync', async (file) => {
     t.ok(file.uuid, `File has synced from remote peer`)

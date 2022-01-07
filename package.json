@@ -14,7 +14,7 @@
     "url": "https://github.com/Telios-org/nebula-drive.git"
   },
   "author": "Hexadecibal",
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "bugs": {
     "url": "https://github.com/Telios-org/nebula-drive/issues"
   },
@@ -25,10 +25,11 @@
     "chokidar": "^3.5.1",
     "codecs": "^2.2.0",
     "concat-stream": "^2.0.0",
-    "corestore": "^6.0.1-alpha.8",
+    "corestore": "^6.0.1-alpha.9",
     "dat-encoding": "^5.0.1",
     "hyperbee": "^1.6.3",
-    "hypercore": "10.0.0-alpha.19",
+    "hyperbeedeebee": "^1.0.1",
+    "hypercore": "10.0.0-alpha.23",
     "hyperswarm": "^3.0.1",
     "is-online": "^9.0.1",
     "memorystream": "^0.3.1",

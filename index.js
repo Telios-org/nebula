@@ -17,7 +17,8 @@ const { v4: uuidv4 } = require('uuid')
 const FixedChunker = require('./util/fixedChunker.js')
 const RequestChunker = require('./util/requestChunker.js')
 const WorkerKeyPairs = require('./util/workerKeyPairs.js')
-const isOnline = require('is-online');
+const isOnline = require('is-online')
+const BSON = require('bson')
 
 const HASH_OUTPUT_LENGTH = 32 // bytes
 const MAX_PLAINTEXT_BLOCK_SIZE = 65536
@@ -126,6 +127,9 @@ class Drive extends EventEmitter {
     // Data here can only be read by peer drives
     // that are sharing the same drive secret
     this._collections.files = await this.database.collection('file')
+
+    // This drastically speeds up queries and is necessary for sorting by fields
+    await this._collections.files.createIndex(['filePath'])
 
     if (this.keyPair && this.joinSwarm) {
       await this.connect()
@@ -289,7 +293,7 @@ class Drive extends EventEmitter {
           discovery_key: this.discoveryKey
         }
 
-        await this._collections.files.put(filePath, fileMeta)
+        await this._collections.files.insert({ filePath, updatedAt: new Date().toISOString(), ...fileMeta })
 
         this.emit('file-add', fileMeta)
 
@@ -299,7 +303,7 @@ class Drive extends EventEmitter {
           ...fileMeta
         })
       } else {
-        let bytes = ''
+        let bytes = 0
         const hash = blake.blake2bInit(HASH_OUTPUT_LENGTH, null)
         const calcHash = new stream.Transform({
           transform
@@ -337,7 +341,7 @@ class Drive extends EventEmitter {
                 discovery_key: this.discoveryKey
               }
 
-              await this._collections.files.put(filePath, fileMeta)
+              await this._collections.files.insert({ filePath, updatedAt: new Date().toISOString(), ...fileMeta })
 
               this.emit('file-add', fileMeta)
               resolve(fileMeta)
@@ -360,9 +364,7 @@ class Drive extends EventEmitter {
     }
 
     try {
-      file = await this._collections.files.get(filePath)
-
-      file = file.value
+      file = await this._collections.files.findOne({ filePath })
 
       const stream = fs.createReadStream(`${this._filesDir}/${file.uuid}`)
 
@@ -535,20 +537,17 @@ class Drive extends EventEmitter {
     }
 
     try {
-      let file = await this._collections.files.get(fp)
+      const _file = await this._collections.files.findOne({ filePath: fp })
 
-      if (!file) return
+      if (!_file) return
 
-      file = await this.metadb.get(file.value.hash)
+      const file = await this.metadb.get(_file.hash)
 
       if(!file) return
 
       fs.unlinkSync(path.join(this._filesDir, file.value.path))
 
-      await this._collections.files.put(fp, {
-        uuid: file.value.uuid,
-        deleted: true
-      })
+      await this._collections.files.update({ _id: _file._id} , { uuid: file.value.uuid, updatedAt: new Date().toISOString(), deleted: true })
 
       await this.metadb.put(file.value.hash, {
         uuid: file.value.uuid,
