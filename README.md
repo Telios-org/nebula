@@ -1,4 +1,4 @@
-# Nebula Drive
+# Nebula
 
 
 ![Build Status](https://github.com/Telios-org/nebula/actions/workflows/node.js.yml/badge.svg)
