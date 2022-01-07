@@ -28,7 +28,7 @@ test('Database - Create new db', async t => {
 })
 
 test('Database - Test put/get', async t => {
-  t.plan(2)
+  t.plan(3)
   
   const keyPair = DHT.keyPair()
   const encryptionKey = Buffer.alloc(32, 'hello world')
@@ -44,21 +44,29 @@ test('Database - Test put/get', async t => {
     
     const collection = await database.collection('foobar')
     
-    await collection.insert({ hello: "world" })
+    await collection.insert({ foo: "bar" })
+    await collection.insert({ foo: "biz" })
+    await collection.insert({ foo: "baz" })
 
     const docs = await collection.find({
-      hello: 'world'
+      foo: 'bar'
     })
 
-    t.equals(docs[0].hello, 'world')
+    t.equals(docs[0].foo, 'bar')
+
+    let doc = await collection.findOne({
+      foo: 'biz'
+    })
+
+    t.equals(doc.foo, 'biz')
 
     await collection.update({_id: docs[0]._id }, { hello: "baz" })
 
-    const val = await collection.findOne({
-      hello: 'baz'
+    doc = await collection.findOne({
+      foo: 'baz'
     })
 
-    t.equals(val.hello, 'baz')
+    t.equals(doc.foo, 'baz')
   } catch (err) {
     t.error(err)
   }

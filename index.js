@@ -129,7 +129,7 @@ class Drive extends EventEmitter {
     this._collections.files = await this.database.collection('file')
 
     // This drastically speeds up queries and is necessary for sorting by fields
-    await this._collections.files.createIndex(['filePath'])
+    await this._collections.files.createIndex(['path'])
 
     if (this.keyPair && this.joinSwarm) {
       await this.connect()
@@ -293,7 +293,7 @@ class Drive extends EventEmitter {
           discovery_key: this.discoveryKey
         }
 
-        await this._collections.files.insert({ filePath, updatedAt: new Date().toISOString(), ...fileMeta })
+        await this._collections.files.insert({ ...fileMeta, updatedAt: new Date().toISOString() })
 
         this.emit('file-add', fileMeta)
 
@@ -341,7 +341,7 @@ class Drive extends EventEmitter {
                 discovery_key: this.discoveryKey
               }
 
-              await this._collections.files.insert({ filePath, updatedAt: new Date().toISOString(), ...fileMeta })
+              await this._collections.files.insert({ ...fileMeta, updatedAt: new Date().toISOString() })
 
               this.emit('file-add', fileMeta)
               resolve(fileMeta)
@@ -364,7 +364,7 @@ class Drive extends EventEmitter {
     }
 
     try {
-      file = await this._collections.files.findOne({ filePath })
+      file = await this._collections.files.findOne({ path: filePath })
 
       const stream = fs.createReadStream(`${this._filesDir}/${file.uuid}`)
 
@@ -537,7 +537,7 @@ class Drive extends EventEmitter {
     }
 
     try {
-      const _file = await this._collections.files.findOne({ filePath: fp })
+      const _file = await this._collections.files.findOne({ path: fp })
 
       if (!_file) return
 
@@ -547,7 +547,7 @@ class Drive extends EventEmitter {
 
       fs.unlinkSync(path.join(this._filesDir, file.value.path))
 
-      await this._collections.files.update({ _id: _file._id} , { uuid: file.value.uuid, updatedAt: new Date().toISOString(), deleted: true })
+      await this._collections.files.update({ _id: _file._id} , { uuid: file.value.uuid, deleted: true, updatedAt: new Date().toISOString() })
 
       await this.metadb.put(file.value.hash, {
         uuid: file.value.uuid,
