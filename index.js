@@ -141,19 +141,20 @@ class Drive extends EventEmitter {
     const stream = this.metadb.createReadStream({ live: true })
     
     stream.on('data', async data => {
-      const op = HyperbeeMessages.Node.decode(data.value)
-
-      const node = {
-        key: op.key.toString('utf8'),
-        value: JSON.parse(op.value.toString('utf8')),
-        seq: data.seq
-      }
-
-      if (
-        node.key !== '__peers' && !this._lastSeq ||
-        node.key !== '__peers' && this._lastSeq && data.seq > this._lastSeq.seq
-      ) {
-        await this._update(node)
+      if(data.value.toString().indexOf('hyperbee') === -1) {
+        const op = HyperbeeMessages.Node.decode(data.value)
+        const node = {
+          key: op.key.toString('utf8'),
+          value: JSON.parse(op.value.toString('utf8')),
+          seq: data.seq
+        }
+ 
+        if (
+          node.key !== '__peers' && !this._lastSeq ||
+          node.key !== '__peers' && this._lastSeq && data.seq > this._lastSeq.seq
+        ) {
+          await this._update(node)
+        }
       }
     })
 
