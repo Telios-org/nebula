@@ -1,6 +1,6 @@
 {
   "name": "@telios/nebula",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Real-time distributed file and data storage.",
   "main": "index.js",
   "scripts": {
@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/Telios-org/nebula-drive",
   "dependencies": {
-    "autobase": "1.0.0-alpha.5",
+    "autobase": "1.0.0-alpha.6",
     "blakejs": "^1.1.0",
     "chokidar": "^3.5.1",
     "codecs": "^2.2.0",
@@ -28,7 +28,7 @@
     "corestore": "^6.0.1-alpha.9",
     "dat-encoding": "^5.0.1",
     "hyperbee": "^1.6.3",
-    "hyperbeedeebee": "^1.0.1",
+    "hyperbeedeebee": "git+https://github.com/hexadecible/hyperbeedeebee.git",
     "hypercore": "10.0.0-alpha.23",
     "hyperswarm": "^3.0.1",
     "is-online": "^9.0.1",
