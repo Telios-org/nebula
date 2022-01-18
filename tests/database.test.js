@@ -43,14 +43,12 @@ test('Database - Test put/get', async t => {
     await database.ready()
     
     const collection = await database.collection('foobar')
-    
+
     await collection.insert({ foo: "bar" })
     await collection.insert({ foo: "biz" })
     await collection.insert({ foo: "baz" })
 
-    const docs = await collection.find({
-      foo: 'bar'
-    })
+    const docs = await collection.find()
 
     t.equals(docs[0].foo, 'bar')
 

@@ -148,6 +148,7 @@ Options include:
     client: true | false
   },
   checkNetworkStatus: true | false // Listen for when the drive's network status changes
+  fulltextSearch: true | false // support full text search indexes
 }
 ```
 
