@@ -1,10 +1,8 @@
+
 name: Build Status
 
-on:
-  push:
-    tags: 
-      - '*'
-
+on: push
+  
 jobs:
   build:
     strategy:
@@ -19,17 +17,19 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - run: npm install
+      - run: npm test
   publish:
     name: Publish Package
     needs: build
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v2
       - name: Use Node.js 16.x
         uses: actions/setup-node@v1
         with:
           node-version: 16.x
+      - run: npm install
       - uses: JS-DevTools/npm-publish@v1
         with:
-          access: 'public'
           token: ${{ secrets.NPM_TOKEN }}
