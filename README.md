@@ -47,7 +47,8 @@ const localDrive = new Drive(__dirname + "/drive", null, {
   swarmOpts: {
     server: true,
     client: true
-  }
+  },
+  fullTextSearch: true
 })
 
 await localDrive.ready()
