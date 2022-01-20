@@ -114,17 +114,18 @@ test('Database - Full text search', async t => {
 
     for(const data of corpus) {
       await collection.insert({ title: data.title, text_body: data.text_body })
+      await collection.ftsIndex(['text_body', 'title'])
     }
  
-    await collection.ftsIndex(['text_body', 'title'])
+    await collection.remove({ title: 'Painting 2' })   
 
     const q1 = await collection.search("happy tree")
 
-    t.equals(q1.length, 3)
+    t.equals(q1.length, 2)
 
-    const q2 = await collection.search("happy tree", { limit: 2 })
+    const q2 = await collection.search("happy tree", { limit: 1 })
 
-    t.equals(q2.length, 2)
+    t.equals(q2.length, 1)
 
     const q3 = await collection.search("noresults")
 
