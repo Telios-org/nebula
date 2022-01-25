@@ -221,7 +221,7 @@ class Drive extends EventEmitter {
       })
     })
 
-    await this._swarm.ready()
+    this._swarm.ready()
   }
 
   async addPeer(peerKey) {
