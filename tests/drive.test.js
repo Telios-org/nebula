@@ -23,9 +23,11 @@ let hyperFiles = []
 const encryptionKey = Buffer.alloc(32, 'hello world')
 
 test('Drive - Create', async t => {
-  t.plan(5)
+  t.plan(6)
 
   await cleanup()
+
+  
 
   drive = new Drive(__dirname + '/drive', null, {
     storage: ram,
