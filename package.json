@@ -1,6 +1,6 @@
 {
   "name": "@telios/nebula",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "Real-time distributed file and data storage.",
   "main": "index.js",
   "scripts": {
@@ -39,9 +39,6 @@
     "sodium-native": "^3.2.0",
     "stopwords": "^0.0.9",
     "uuid": "^8.2.0"
-  },
-  "resolutions": {
-    "@hyperswarm/dht": "5.0.12"
   },
   "devDependencies": {
     "@commitlint/cli": "^12.0.1",
