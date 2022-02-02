@@ -43,6 +43,7 @@ test('Drive - Create', async t => {
 
   drive.on('network-updated', async data => {
     networkCount += 1
+
     t.ok(data)
 
     if(networkCount == 2) {

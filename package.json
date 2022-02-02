@@ -40,7 +40,7 @@
     "stopwords": "^0.0.9",
     "uuid": "^8.2.0"
   },
-  "override": {
+  "resolutions": {
     "@hyperswarm/dht": "5.0.12"
   },
   "devDependencies": {
