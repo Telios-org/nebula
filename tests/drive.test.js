@@ -23,7 +23,9 @@ let hyperFiles = []
 const encryptionKey = Buffer.alloc(32, 'hello world')
 
 test('Drive - Create', async t => {
-  t.plan(5)
+  t.plan(9)
+
+  let networkCount = 0
 
   await cleanup()
 
@@ -31,9 +33,20 @@ test('Drive - Create', async t => {
     storage: ram,
     keyPair,
     encryptionKey,
+    checkNetworkStatus: true,
+    fullTextSearch: true,
     swarmOpts: {
       server: true,
       client: true
+    }
+  })
+
+  drive.on('network-updated', async data => {
+    networkCount += 1
+    t.ok(data)
+
+    if(networkCount == 2) {
+      await drive.close()
     }
   })
 
@@ -50,6 +63,21 @@ test('Drive - Upload Local Encrypted File', async t => {
   t.plan(24)
 
   try {
+
+    drive = new Drive(__dirname + '/drive', null, {
+      storage: ram,
+      keyPair,
+      encryptionKey,
+      checkNetworkStatus: true,
+      fullTextSearch: true,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await drive.ready()
+
     const readStream = fs.createReadStream(path.join(__dirname, '/data/email.eml'))
     const file = await drive.writeFile('/email/rawEmailEncrypted.eml', readStream, { encrypted: true })
 
@@ -92,7 +120,7 @@ test('Drive - Create Seed Peer', async t => {
 
   drive2 = new Drive(__dirname + '/drive2', drive.publicKey, {
     keyPair: keyPair2,
-    // encryptionKey: drive.encryptionKey,
+    encryptionKey: drive.encryptionKey,
     swarmOpts: {
       server: true,
       client: true
