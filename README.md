@@ -302,6 +302,15 @@ Emitted when the drive has recieved a message from a peer.
 - `peerPubKey`: Public key of the peer that sent the message
 - `socket`: The socket returned on this event can be used as a duplex stream for bi-directional communication with the connecting peer. `socket.write` `socket.on('data, data => {})`
 
+#### `drive.on('update-collection', (item) => {})`
+
+Emitted when a collection has received an update from a remote peer
+
+- `item`
+  - `collection`: The collection that was updated
+  - `_id`: The updated document's _id
+  - `author`: Public key of the peer who commited the update  
+
 #### `drive.on('file-add', (file, enc) => {})`
 
 Emitted when a new file has been added to a local drive.

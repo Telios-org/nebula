@@ -138,7 +138,6 @@ class Drive extends EventEmitter {
 
     this._lastSeq = await this._localHB.get('lastSeq')
 
-    // const stream = this.metadb.createReadStream({ live: true })
     const stream = this.metadb.createReadStream({ live: true })
     
     stream.on('data', async data => {
@@ -156,6 +155,37 @@ class Drive extends EventEmitter {
         ) {
           await this._update(node)
         }
+      }
+    })
+
+    const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
+
+    cStream.on('data', async data => {
+      if(data.value.toString().indexOf('hyperbee') === -1) {
+        const op = HyperbeeMessages.Node.decode(data.value)
+        const key = op.key.toString('utf8')
+        let collection
+        let value
+
+        if(key.split('-').length === 1) return
+
+        collection = key.split('-')[0]
+
+        try {
+          value = BSON.deserialize(op.value)
+        } catch(err) {
+          // womp womp
+        }
+
+        if(!collection || !value._id || value.author === this.keyPair.publicKey.toString('hex')) return
+
+        const node = {
+          collection,
+          _id: value._id.toString('hex'),
+          author: value.author
+        }
+
+        this.emit('update-collection', node)
       }
     })
 

@@ -117,7 +117,7 @@ test('Drive - Read Local Encrypted File', async t => {
 })
 
 test('Drive - Create Seed Peer', async t => {
-  t.plan(22)
+  t.plan(44)
 
   drive2 = new Drive(__dirname + '/drive2', drive.publicKey, {
     keyPair: keyPair2,
@@ -129,6 +129,10 @@ test('Drive - Create Seed Peer', async t => {
   })
 
   await drive2.ready()
+
+  drive2.on('update-collection', async data => {
+    t.ok(data._id)
+  })
 
   drive2.on('file-sync', async (file) => {
     t.ok(file.uuid, `File has synced from remote peer`)

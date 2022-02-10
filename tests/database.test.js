@@ -135,30 +135,28 @@ test('Database - Full text search', async t => {
   }
 })
 
-// Currently not a supported function of Hyperbeedeebee
-
-// test('Database - Delete from hyperbee', async t => {
-//   t.plan(1)
+test('Database - Remove item from hyperbee', async t => {
+  t.plan(1)
   
-//   const keyPair = DHT.keyPair()
-//   const encryptionKey = Buffer.alloc(32, 'hello world')
+  const keyPair = DHT.keyPair()
+  const encryptionKey = Buffer.alloc(32, 'hello world')
 
-//   try {
-//     const database = new Database(ram, {
-//       keyPair,
-//       encryptionKey
-//     })
+  try {
+    const database = new Database(ram, {
+      keyPair,
+      encryptionKey
+    })
 
-//     await database.ready()
+    await database.ready()
     
-//     const collection = await database.collection('foobar')
-//     await collection.insert({ hello: 'bar' })
-//     await collection.del('foo')
+    const collection = await database.collection('foobar')
+    const doc = await collection.insert({ foo: 'bar' })
+    await collection.remove({ _id: doc._id })
 
-//     // const item = await collection.get('foo')
+    const item = await collection.find({ _id: doc._id })
 
-//     t.equals(item, null)
-//   } catch (err) {
-//     t.error(err)
-//   }
-// })
+    t.equals(0, item.length)
+  } catch (err) {
+    t.error(err)
+  }
+})
