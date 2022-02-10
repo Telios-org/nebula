@@ -117,7 +117,7 @@ test('Drive - Read Local Encrypted File', async t => {
 })
 
 test('Drive - Create Seed Peer', async t => {
-  t.plan(44)
+  t.plan(22)
 
   drive2 = new Drive(__dirname + '/drive2', drive.publicKey, {
     keyPair: keyPair2,
@@ -129,10 +129,6 @@ test('Drive - Create Seed Peer', async t => {
   })
 
   await drive2.ready()
-
-  drive2.on('update-collection', async data => {
-    t.ok(data._id)
-  })
 
   drive2.on('file-sync', async (file) => {
     t.ok(file.uuid, `File has synced from remote peer`)
@@ -223,10 +219,14 @@ test('Drive - Fail to Fetch Files from Remote Drive', async t => {
 })
 
 test('Drive - Unlink Local File', async t => {
-  t.plan(2)
+  t.plan(3)
 
   const drive1Size = drive.info().size
   const drive2Size = drive2.info().size
+
+  drive2.on('update-collection', async data => {
+    t.ok(data._id)
+  })
 
   drive.on('file-unlink', file => {
     t.ok(drive1Size > drive.info().size, `Drive1 size before: ${drive1Size} > size after: ${drive.info().size}`)
