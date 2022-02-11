@@ -29,7 +29,23 @@ const FILE_BATCH_SIZE = 10 // How many parallel requests are made in each file r
 
 
 class Drive extends EventEmitter {
-  constructor(drivePath, peerPubKey, { storage, keyPair, writable, swarmOpts, encryptionKey, fileTimeout, fileRetryAttempts, checkNetworkStatus, joinSwarm, fullTextSearch }) {
+  constructor(
+    drivePath, 
+    peerPubKey, 
+    { 
+      storage, 
+      keyPair, 
+      writable, 
+      swarmOpts, 
+      encryptionKey, 
+      fileTimeout, 
+      fileRetryAttempts, 
+      checkNetworkStatus, 
+      joinSwarm,
+      fullTextSearch,
+      blind
+    }
+  ) {
     super()
 
     this.storage = storage
@@ -52,6 +68,7 @@ class Drive extends EventEmitter {
       internet: false,
       drive: false
     }
+    this.blind = blind ? blind : false // Set to true if blind mirroring another drive (you don't have the encryption key)
 
     // When using custom storage, transform drive path into beginning of the storage namespace
     this.storageName = drivePath.slice(drivePath.lastIndexOf('/') + 1, drivePath.length)
@@ -158,36 +175,42 @@ class Drive extends EventEmitter {
       }
     })
 
-    const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
+    if(!this.blind) {
+      const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
 
-    cStream.on('data', async data => {
-      if(data.value.toString().indexOf('hyperbee') === -1) {
-        const op = HyperbeeMessages.Node.decode(data.value)
-        const key = op.key.toString('utf8')
-        let collection
-        let value
+      cStream.on('data', async data => {
+        if(data.value.toString().indexOf('hyperbee') === -1) {
+          const op = HyperbeeMessages.Node.decode(data.value)
+          const key = op.key.toString('utf8')
+          let collection
+          let value
 
-        if(key.split('-').length === 1) return
+          if(key.split('-').length === 1) return
 
-        collection = key.split('-')[0]
+          collection = key.split('-')[0]
 
-        try {
-          value = BSON.deserialize(op.value)
-        } catch(err) {
-          // womp womp
+          try {
+            value = BSON.deserialize(op.value)
+          } catch(err) {
+            // womp womp
+          }
+
+          if(!collection || !value._id || value.author === this.keyPair.publicKey.toString('hex')) return
+
+          const node = {
+            collection,
+            _id: value._id.toString('hex'),
+            author: value.author
+          }
+
+          this.emit('update-collection', node)
         }
-
-        if(!collection || !value._id || value.author === this.keyPair.publicKey.toString('hex')) return
-
-        const node = {
-          collection,
-          _id: value._id.toString('hex'),
-          author: value.author
-        }
-
-        this.emit('update-collection', node)
-      }
-    })
+      })
+    } else {
+      this.database.on('update-collection', () => {
+        this.emit('update-collection')
+      })
+    }
 
     this.opened = true
   }
@@ -584,6 +607,7 @@ class Drive extends EventEmitter {
       await this.metadb.put(file.value.hash, {
         uuid: file.value.uuid,
         discovery_key: file.value.discovery_key,
+        size: file.value.size,
         deleted: true
       })
 
