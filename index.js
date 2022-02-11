@@ -195,7 +195,7 @@ class Drive extends EventEmitter {
             // womp womp
           }
 
-          if(!collection || !value._id || value.author === this.keyPair.publicKey.toString('hex')) return
+          if(!collection || !value || !value._id || value.author === this.keyPair.publicKey.toString('hex')) return
 
           const node = {
             collection,
