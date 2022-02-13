@@ -31,10 +31,10 @@ const FILE_BATCH_SIZE = 10 // How many parallel requests are made in each file r
 class Drive extends EventEmitter {
   constructor(
     drivePath, 
-    peerPubKey, 
+    peerPubKey, // Key used to clone and seed drive. Should only be shared with trusted sources
     { 
       storage, 
-      keyPair, 
+      keyPair, // ed25519 keypair to listen on
       writable, 
       swarmOpts, 
       encryptionKey, 
@@ -42,8 +42,8 @@ class Drive extends EventEmitter {
       fileRetryAttempts, 
       checkNetworkStatus, 
       joinSwarm,
-      fullTextSearch,
-      blind
+      fullTextSearch, // Initialize a corestore to support full text search indexes.
+      blind // Set to true if blind mirroring another drive (you don't have the encryption key)
     }
   ) {
     super()
@@ -55,10 +55,10 @@ class Drive extends EventEmitter {
     this.drivePath = drivePath
     this.swarmOpts = swarmOpts
     this.publicKey = null
-    this.peerPubKey = peerPubKey // Key used to clone and seed drive. Should only be shared with trusted sources
-    this.keyPair = keyPair // ed25519 keypair to listen on
+    this.peerPubKey = peerPubKey 
+    this.keyPair = keyPair 
     this.writable = writable
-    this.fullTextSearch = fullTextSearch // Initialize a corestore to support full text search indexes.
+    this.fullTextSearch = fullTextSearch 
     this.fileTimeout = fileTimeout || FILE_TIMEOUT
     this.fileRetryAttempts = fileRetryAttempts-1 || FILE_RETRY_ATTEMPTS-1
     this.requestQueue = new RequestChunker(null, FILE_BATCH_SIZE)
@@ -68,12 +68,11 @@ class Drive extends EventEmitter {
       internet: false,
       drive: false
     }
-    this.blind = blind ? blind : false // Set to true if blind mirroring another drive (you don't have the encryption key)
+    this.blind = blind ? blind : false 
 
     // When using custom storage, transform drive path into beginning of the storage namespace
     this.storageName = drivePath.slice(drivePath.lastIndexOf('/') + 1, drivePath.length)
   
-
     this._localCore = new Hypercore(this.storage || path.join(drivePath, `./LocalCore`), { storageNamespace: `${this.storageName}:local-core` })
     this._swarm = null
     this._workerKeyPairs = new WorkerKeyPairs(FILE_BATCH_SIZE)
@@ -118,8 +117,8 @@ class Drive extends EventEmitter {
       // gracefully catch uncaught exceptions
     })
 
-     // Periodically check this drive is connected to the internet.
-    // When internet is down, emit a network status updated event.
+    // Periodically check this drive's connection to the internet.
+    // When the internet is down, emit a network status updated event.
     if(this.checkNetworkStatus) {
       this._checkInternetInt = setInterval(async () => {
         if(!this._checkInternetInProgress) {
@@ -203,12 +202,13 @@ class Drive extends EventEmitter {
             author: value.author
           }
 
-          this.emit('update-collection', node)
+          this.emit('collection-update', node)
         }
       })
     } else {
-      this.database.on('update-collection', () => {
-        this.emit('update-collection')
+      // If this drive can't decipher the data inside the remote hypercore's then just listen for when those cores are updated.
+      this.database.on('collection-update', () => {
+        this.emit('collection-update')
       })
     }
 
@@ -637,7 +637,8 @@ class Drive extends EventEmitter {
       peerPubKey: this.peerPubKey,
       acl: this.swarmOpts && this.swarmOpts.acl ? this.swarmOpts.acl : null,
       joinSwarm: this.joinSwarm,
-      fts: this.fullTextSearch
+      fts: this.fullTextSearch,
+      blind: this.blind
     })
 
     this.database.on('disconnected', () => {
