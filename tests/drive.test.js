@@ -224,7 +224,7 @@ test('Drive - Unlink Local File', async t => {
   const drive1Size = drive.info().size
   const drive2Size = drive2.info().size
 
-  drive2.on('update-collection', async data => {
+  drive2.on('collection-update', async data => {
     t.ok(data._id)
   })
 
