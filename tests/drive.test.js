@@ -18,6 +18,8 @@ let drive2
 let drive3
 let drive4
 let drive5
+let drive6
+
 let hyperFiles = []
 
 const encryptionKey = Buffer.alloc(32, 'hello world')
@@ -140,6 +142,29 @@ test('Drive - Create Seed Peer', async t => {
   hyperFiles.push(file)
 })
 
+test('Drive - Create Seed Peer with Max Storage of 12mb', async t => {
+  t.plan(4)
+  
+  drive6 = new Drive(__dirname + '/drive6', drive.publicKey, {
+    keyPair: DHT.keyPair(),
+    encryptionKey: drive.encryptionKey,
+    storageMaxBytes: 1000 * 1000 * 12, // max size = 12mb
+    swarmOpts: {
+      server: true,
+      client: true
+    }
+  })
+
+
+
+  await drive6.ready()
+
+
+  drive6.on('file-sync', async (file) => {
+    t.ok(file.uuid, `File has synced from remote peer`)
+  })
+})
+
 test('Drive - Fetch Files from Remote Drive', async t => {
   t.plan(4)
 
@@ -259,13 +284,13 @@ test('Drive - Receive messages', async t => {
   })
 })
 
-test('Drive - Get total size in bytes', t => {
-  t.plan(3)
+// test('Drive - Get total size in bytes', t => {
+//   t.plan(3)
 
-  t.ok(drive.info(), `Drive 1 has size ${drive.info().size}`)
-  t.ok(drive2.info(), `Drive 2 has size ${drive2.info().size}`)
-  t.ok(drive3.info(), `Drive 3 has size ${drive3.info().size}`)
-})
+//   t.ok(drive.info(), `Drive 1 has size ${drive.info().size}`)
+//   t.ok(drive2.info(), `Drive 2 has size ${drive2.info().size}`)
+//   t.ok(drive3.info(), `Drive 3 has size ${drive3.info().size}`)
+// })
 
 test.onFinish(async () => {
   await drive.close()
@@ -273,6 +298,7 @@ test.onFinish(async () => {
   await drive3.close()
   await drive4.close()
   await drive5.close()
+  await drive6.close()
 
   await cleanup()
 
@@ -308,6 +334,12 @@ async function cleanup() {
   if (fs.existsSync(path.join(__dirname, '/drive5'))) {
     await del([
       path.join(__dirname, '/drive5')
+    ])
+  }
+
+  if (fs.existsSync(path.join(__dirname, '/drive6'))) {
+    await del([
+      path.join(__dirname, '/drive6')
     ])
   }
 }

@@ -43,7 +43,8 @@ class Drive extends EventEmitter {
       checkNetworkStatus, 
       joinSwarm,
       fullTextSearch, // Initialize a corestore to support full text search indexes.
-      blind // Set to true if blind mirroring another drive (you don't have the encryption key)
+      blind, // Set to true if blind mirroring another drive (you don't have the encryption key)
+      storageMaxBytes // Max size this drive will store in bytes before turning off replication/file syncing
     }
   ) {
     super()
@@ -68,7 +69,13 @@ class Drive extends EventEmitter {
       internet: false,
       drive: false
     }
-    this.blind = blind ? blind : false 
+    this.blind = blind ? blind : false
+    this.storageMaxBytes = storageMaxBytes || Infinity
+    this.stat = {
+      file_bytes: 0,
+      core_bytes: 0,
+      total_bytes: 0
+    }
 
     // When using custom storage, transform drive path into beginning of the storage namespace
     this.storageName = drivePath.slice(drivePath.lastIndexOf('/') + 1, drivePath.length)
@@ -82,6 +89,7 @@ class Drive extends EventEmitter {
     this._lastSeq = null
     this._checkInternetInt = null
     this._checkInternetInProgress = false
+    this._fileStatPath = this.drivePath + '/Files/file_stat.txt'
 
     if (!fs.existsSync(drivePath)) {
       fs.mkdirSync(drivePath)
@@ -132,6 +140,16 @@ class Drive extends EventEmitter {
 
   async ready() {
     await this._bootstrap()
+
+    let fileBytes = '0'
+
+    if (!fs.existsSync(this._fileStatPath)) {
+      fs.writeFileSync(this._fileStatPath, fileBytes)
+    } else {
+      fileBytes = fs.readFileSync(this._fileStatPath)
+    }
+
+    await this.database._updateStatBytes(parseInt(fileBytes))
 
     this.publicKey = this.database.localMetaCore.key.toString('hex')
 
@@ -325,6 +343,8 @@ class Drive extends EventEmitter {
         const fixedChunker = new FixedChunker(readStream, MAX_PLAINTEXT_BLOCK_SIZE)
         const { key, header, file } = await Crypto.encryptStream(fixedChunker, writeStream)
 
+        await this.database._updateStatBytes(file.size)
+
         await this.metadb.put(file.hash, {
           uuid,
           size: file.size,
@@ -376,6 +396,8 @@ class Drive extends EventEmitter {
             const _hash = Buffer.from(blake.blake2bFinal(hash)).toString('hex')
 
             if (bytes > 0) {
+              await this.database._updateStatBytes(bytes)
+
               await this.metadb.put(_hash, {
                 uuid,
                 size: bytes,
@@ -604,6 +626,8 @@ class Drive extends EventEmitter {
 
       await this._collections.files.update({ _id: _file._id} , { uuid: file.value.uuid, deleted: true, updatedAt: new Date().toISOString() })
 
+      await this.database._updateStatBytes(-Math.abs(file.value.size))
+
       await this.metadb.put(file.value.hash, {
         uuid: file.value.uuid,
         discovery_key: file.value.discovery_key,
@@ -638,7 +662,10 @@ class Drive extends EventEmitter {
       acl: this.swarmOpts && this.swarmOpts.acl ? this.swarmOpts.acl : null,
       joinSwarm: this.joinSwarm,
       fts: this.fullTextSearch,
-      blind: this.blind
+      blind: this.blind,
+      stat: this.stat,
+      storageMaxBytes: this.storageMaxBytes,
+      fileStatPath: this._fileStatPath
     })
 
     this.database.on('disconnected', () => {
@@ -683,11 +710,14 @@ class Drive extends EventEmitter {
       lastSeq.value.seq !== data.seq
     ) {
       
-
       if (data.value.hash) {
         try {
           await this._localHB.put(`lastSeq`, { seq: data.seq })
-          this.requestQueue.addFile(data.value)
+          await this.database._updateStatBytes(data.value.size)
+
+          if(this.stat.total_bytes <= this.storageMaxBytes) {
+            this.requestQueue.addFile(data.value)
+          }
         } catch (err) {
           throw err
         }
@@ -703,6 +733,8 @@ class Drive extends EventEmitter {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath)
 
+          await this.database._updateStatBytes(-Math.abs(data.value.size))
+
           setTimeout(() => {
             this.emit('file-unlink', data.value)
           })
@@ -713,6 +745,7 @@ class Drive extends EventEmitter {
     }
   }
 
+  // Deprecated
   info() {
     const bytes = getTotalSize(this.drivePath)
     return {

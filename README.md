@@ -138,6 +138,7 @@ Options include:
 ```js
 {
   storage, // Override Hypercore's default random-access-file storage with a different random-access-storage module
+  storageMaxBytes, // Maximum bytes the drive will store before turning off replication/file syncing
   encryptionKey,  // optionally pass an encryption key to encrypt the drive's database
   keyPair: { // ed25519 keypair
     publicKey, 
