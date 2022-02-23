@@ -218,13 +218,15 @@ class Drive extends EventEmitter {
             // womp womp
           }
 
-          const node = {
-            collection,
-            _id: value._id.toString('hex'),
-            author: value.author
-          }
+          if(value && value._id) {
+            const node = {
+              collection,
+              _id: value._id.toString('hex'),
+              author: value.author
+            }
 
-          this.emit('collection-update', node)
+            this.emit('collection-update', node)
+          }
         }
       })
     } else {
