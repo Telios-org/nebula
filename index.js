@@ -307,6 +307,12 @@ class Drive extends EventEmitter {
 
   // Remove Peer
   async removePeer(peerKey) {
+    let remotePeers = await this._localHB.get('remotePeers')
+
+    const peers = remotePeers.value.filter(peer => peer !== peerKey)
+
+    await this._localHB.put('remotePeers', peers)
+
     await this.database.removeInput(peerKey)
   }
 
