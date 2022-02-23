@@ -170,7 +170,7 @@ class Drive extends EventEmitter {
       await this.connect()
     }
 
-    this._lastSeq = await this._localHB.get('lastSeq')
+    const lastMetaSeq = await this._localHB.get('meta-lastSeq')
 
     const stream = this.metadb.createReadStream({ live: true })
     
@@ -184,8 +184,8 @@ class Drive extends EventEmitter {
         }
  
         if (
-          node.key !== '__peers' && !this._lastSeq ||
-          node.key !== '__peers' && this._lastSeq && data.seq > this._lastSeq.seq
+          node.key !== '__peers' && !lastMetaSeq ||
+          node.key !== '__peers' && lastMetaSeq && data.seq > lastMetaSeq.seq
         ) {
           await this._update(node)
         }
@@ -193,10 +193,16 @@ class Drive extends EventEmitter {
     })
 
     if(!this.blind) {
+      const lastCollectionSeq = await this._localHB.get('collection-lastSeq')
+
       const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
 
       cStream.on('data', async data => {
         if(data.value.toString().indexOf('hyperbee') === -1) {
+          if(lastCollectionSeq && lastCollectionSeq.seq && data.seq < lastCollectionSeq.seq) return
+
+          await this._localHB.put('collection-lastSeq', { seq: data.seq })
+
           const op = HyperbeeMessages.Node.decode(data.value)
           const key = op.key.toString('utf8')
           let collection
@@ -211,8 +217,6 @@ class Drive extends EventEmitter {
           } catch(err) {
             // womp womp
           }
-
-          if(!collection || !value || !value._id || value.author === this.keyPair.publicKey.toString('hex')) return
 
           const node = {
             collection,
@@ -705,20 +709,20 @@ class Drive extends EventEmitter {
 
   async _update(data) {
 
-    let lastSeq
-    lastSeq = await this._localHB.get(`lastSeq`)
+    let lastMetaSeq
+    lastMetaSeq = await this._localHB.get(`meta-lastSeq`)
 
-    if (!lastSeq) lastSeq = { value: { seq: null } }
+    if (!lastMetaSeq) lastMetaSeq = { value: { seq: null } }
     this.emit('sync')
     if (
       !data.value.deleted &&
       data.value.peer_key !== this.keyPair.publicKey.toString('hex') &&
-      lastSeq.value.seq !== data.seq
+      lastMetaSeq.value.seq !== data.seq
     ) {
       
       if (data.value.hash) {
         try {
-          await this._localHB.put(`lastSeq`, { seq: data.seq })
+          await this._localHB.put(`meta-lastSeq`, { seq: data.seq })
           await this.database._updateStatBytes(data.value.size)
 
           if(this.stat.total_bytes <= this.storageMaxBytes) {
