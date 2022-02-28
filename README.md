@@ -385,12 +385,19 @@ Example:
 const docs = await collection.createIndex(['name','address'])
 ```
 
-#### `await collection.ftsIndex([prop1, prop2, ...])`
+#### `await collection.ftsIndex([prop1, prop2, ...], docs)`
 
 Create a full text search index from a collection's properties
 
 ```js
-await collection.ftsIndex(['address', 'first_name', 'last_name'])
+const docs = []
+
+// Documents can only be added to search indexes after they've been inserted into a collection.
+const doc = await collection.insert(item)
+
+docs.push(doc)
+
+await collection.ftsIndex(['address', 'first_name', 'last_name'], docs)
 ```
 
 #### `const results = await collection.search(query, [opts])`

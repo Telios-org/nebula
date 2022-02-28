@@ -111,11 +111,14 @@ test('Database - Full text search', async t => {
     await database.ready()
     
     const collection = await database.collection('BobRoss')
-
+    const inserted = []
+    
     for(const data of corpus) {
-      await collection.insert({ title: data.title, text_body: data.text_body })
-      await collection.ftsIndex(['text_body', 'title'])
+      const doc = await collection.insert({ title: data.title, text_body: data.text_body })
+      inserted.push(doc)
     }
+
+    await collection.ftsIndex(['text_body', 'title'], inserted)
  
     await collection.remove({ title: 'Painting 2' })   
 
