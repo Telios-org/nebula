@@ -19,6 +19,7 @@ const RequestChunker = require('./util/requestChunker.js')
 const WorkerKeyPairs = require('./util/workerKeyPairs.js')
 const isOnline = require('is-online')
 const BSON = require('bson')
+const Datastore = require('nedb-promises')
 
 const HASH_OUTPUT_LENGTH = 32 // bytes
 const MAX_PLAINTEXT_BLOCK_SIZE = 65536
@@ -85,7 +86,7 @@ class Drive extends EventEmitter {
     this._workerKeyPairs = new WorkerKeyPairs(FILE_BATCH_SIZE)
     this._collections = {}
     this._filesDir = path.join(drivePath, `./Files`)
-    this._localHB = null // Local Key value datastore only. This db does not sync with remote drives.
+    this._localDB = null // Local Key value datastore only
     this._lastSeq = null
     this._checkInternetInt = null
     this._checkInternetInProgress = false
@@ -139,17 +140,20 @@ class Drive extends EventEmitter {
   }
 
   async ready() {
+    this._localDB = Datastore.create({ filename: `${this.drivePath}/LocalDS/store.db` })
+    
+    await this._localDB.load()
+
     await this._bootstrap()
 
-    let fileBytes = '0'
+    const stat = await this._localDB.findOne({ key: 'stat' })
 
-    if (!fs.existsSync(this._fileStatPath)) {
-      fs.writeFileSync(this._fileStatPath, fileBytes)
+    if(!stat) {
+      await this.database._updateStatBytes(0)
+      await this._localDB.update({ key: 'stat' }, { ...this.stat }, { upsert: true })
     } else {
-      fileBytes = fs.readFileSync(this._fileStatPath)
+      this.stat = stat
     }
-
-    await this.database._updateStatBytes(parseInt(fileBytes))
 
     this.publicKey = this.database.localMetaCore.key.toString('hex')
 
@@ -170,7 +174,9 @@ class Drive extends EventEmitter {
       await this.connect()
     }
 
-    const lastMetaSeq = await this._localHB.get('meta-lastSeq')
+    let lastMetaSeq
+
+    lastMetaSeq = await this._localDB.findOne({ key: 'meta-lastSeq' })
 
     const stream = this.metadb.createReadStream({ live: true })
     
@@ -193,7 +199,7 @@ class Drive extends EventEmitter {
     })
 
     if(!this.blind) {
-      const lastCollectionSeq = await this._localHB.get('collection-lastSeq')
+      const lastCollectionSeq = await this._localDB.findOne({ key: 'collection-lastSeq' })
 
       const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
 
@@ -201,7 +207,7 @@ class Drive extends EventEmitter {
         if(data.value.toString().indexOf('hyperbee') === -1) {
           if(lastCollectionSeq && lastCollectionSeq.seq && data.seq < lastCollectionSeq.seq) return
 
-          await this._localHB.put('collection-lastSeq', { seq: data.seq })
+          await this._localDB.update({ key: 'collection-lastSeq'  }, { seq: data.seq }, { upsert: true })
 
           const op = HyperbeeMessages.Node.decode(data.value)
           const key = op.key.toString('utf8')
@@ -302,22 +308,22 @@ class Drive extends EventEmitter {
   }
 
   async addPeer(peerKey) {
-    const remotePeers = await this._localHB.get('remotePeers')
+    const remotePeers = await this._localDB.findOne({ key: 'remotePeers' })
 
     const peers = [...remotePeers.value, peerKey]
 
-    await this._localHB.put('remotePeers', peers)
+    await this._localDB.update({ key: 'remotePeers' }, { peers }, { upsert: true })
 
     await this.database.addInput(peerKey)
   }
 
   // Remove Peer
   async removePeer(peerKey) {
-    let remotePeers = await this._localHB.get('remotePeers')
+    let remotePeers = await this._localDB.findOne({ key: 'remotePeers' })
 
     const peers = remotePeers.value.filter(peer => peer !== peerKey)
 
-    await this._localHB.put('remotePeers', peers)
+    await this._localDB.update({ key: 'remotePeers' }, { peers }, { upsert: true })
 
     await this.database.removeInput(peerKey)
   }
@@ -434,7 +440,6 @@ class Drive extends EventEmitter {
 
               this.emit('file-add', fileMeta)
               resolve(fileMeta)
-
             } else {
               reject('No bytes were written.')
             }
@@ -515,18 +520,22 @@ class Drive extends EventEmitter {
       const requests = []
 
       for (let file of batch) {
-        requests.push(new Promise(async (resolve, reject) => {
-          if (file.discovery_key) {
-            const keyPair = this._workerKeyPairs.getKeyPair()
-            const stream = await this.fetchFileByDriveHash(file.discovery_key, file.hash, { key: file.key, header: file.header, keyPair })
+        await this.database._updateStatBytes(file.size)
 
-            await cb(stream, file)
+        if(this.stat.total_bytes <= this.storageMaxBytes) {
+          requests.push(new Promise(async (resolve, reject) => {
+            if (file.discovery_key) {
+              const keyPair = this._workerKeyPairs.getKeyPair()
+              const stream = await this.fetchFileByDriveHash(file.discovery_key, file.hash, { key: file.key, header: file.header, keyPair })
 
-            resolve()
-          } else {
-            // TODO: Fetch files by hash
-          }
-        }))
+              await cb(stream, file)
+
+              resolve()
+            } else {
+              // TODO: Fetch files by hash
+            }
+          }))
+        }
       }
 
       await Promise.all(requests)
@@ -660,13 +669,8 @@ class Drive extends EventEmitter {
   }
 
   async _bootstrap() {
-    // Init local core
-    this._localHB = new Hyperbee(this._localCore, {
-      keyEncoding: 'utf-8',
-      valueEncoding: 'json'
-    })
-
     this.database = new Database(this.storage || this.drivePath, {
+      localDB: this._localDB,
       keyPair: this.keyPair,
       storageName: this.storageName,
       encryptionKey: this.encryptionKey,
@@ -710,9 +714,9 @@ class Drive extends EventEmitter {
   }
 
   async _update(data) {
-
     let lastMetaSeq
-    lastMetaSeq = await this._localHB.get(`meta-lastSeq`)
+
+    lastMetaSeq = await this._localDB.findOne({ key: 'meta-lastSeq' })
 
     if (!lastMetaSeq) lastMetaSeq = { value: { seq: null } }
     this.emit('sync')
@@ -724,8 +728,7 @@ class Drive extends EventEmitter {
       
       if (data.value.hash) {
         try {
-          await this._localHB.put(`meta-lastSeq`, { seq: data.seq })
-          await this.database._updateStatBytes(data.value.size)
+          await this._localDB.update({ key: 'meta-lastSeq' }, { seq: data.seq }, { upsert: true })
 
           if(this.stat.total_bytes <= this.storageMaxBytes) {
             this.requestQueue.addFile(data.value)

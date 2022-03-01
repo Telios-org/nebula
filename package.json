@@ -1,6 +1,6 @@
 {
   "name": "@telios/nebula",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Real-time distributed file and data storage.",
   "main": "index.js",
   "scripts": {
@@ -32,13 +32,9 @@
     "hypercore": "10.0.0-alpha.23",
     "hyperswarm": "^3.0.1",
     "is-online": "^9.0.1",
-    "leveldown": "^6.1.0",
-    "levelup": "^5.1.1",
     "memorystream": "^0.3.1",
     "natural": "^5.1.11",
-    "nedb": "^1.8.0",
     "nedb-promises": "^6.0.3",
-    "promisify": "^0.0.3",
     "pump": "^3.0.0",
     "random-access-memory": "^3.1.1",
     "sodium-native": "^3.2.0",
