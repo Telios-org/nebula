@@ -21,7 +21,6 @@ class FileDB {
       data = await this._read()
       this.cache = data
     }
-    
     return data[key]
   }
 

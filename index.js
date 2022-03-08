@@ -72,11 +72,7 @@ class Drive extends EventEmitter {
     }
     this.blind = blind ? blind : false
     this.storageMaxBytes = storageMaxBytes || Infinity
-    this.stat = {
-      file_bytes: 0,
-      core_bytes: 0,
-      total_bytes: 0
-    }
+    
 
     // When using custom storage, transform drive path into beginning of the storage namespace
     this.storageName = drivePath.slice(drivePath.lastIndexOf('/') + 1, drivePath.length)
@@ -91,6 +87,11 @@ class Drive extends EventEmitter {
     this._checkInternetInt = null
     this._checkInternetInProgress = false
     this._fileStatPath = this.drivePath + '/Files/file_stat.txt'
+    this._stat = {
+      file_bytes: 0,
+      core_bytes: 0,
+      total_bytes: 0
+    }
 
     if (!fs.existsSync(drivePath)) {
       fs.mkdirSync(drivePath)
@@ -146,9 +147,9 @@ class Drive extends EventEmitter {
 
     if(!stat) {
       await this.database._updateStatBytes(0)
-      await this._localDB.put('stat', { ...this.stat })
+      await this._localDB.put('stat', { ...this._stat })
     } else {
-      this.stat = stat
+      this._stat = stat
     }
 
     this.publicKey = this.database.localMetaCore.key.toString('hex')
@@ -670,7 +671,7 @@ class Drive extends EventEmitter {
       joinSwarm: this.joinSwarm,
       fts: this.fullTextSearch,
       blind: this.blind,
-      stat: this.stat,
+      stat: this._stat,
       storageMaxBytes: this.storageMaxBytes,
       fileStatPath: this._fileStatPath
     })
@@ -759,6 +760,10 @@ class Drive extends EventEmitter {
     return {
       size: bytes
     }
+  }
+
+  async stat() {
+    return this._localDB.get('stat')
   }
 
   /**

@@ -297,6 +297,18 @@ await drive.fetchFileBatch(files, (stream, file) => {
 
 Fully close the drive and all of it's resources.
 
+#### `await drive.stat()`
+
+Returns the drive's storage info
+
+```js
+{
+  file_bytes: 0,
+  core_bytes: 0,
+  total_bytes: 0
+}
+```
+
 #### `drive.on('message', (peerPubKey, socket) => {})`
 
 Emitted when the drive has recieved a message from a peer.

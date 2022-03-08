@@ -63,7 +63,7 @@ test('Drive - Create', async t => {
 })
 
 test('Drive - Upload Local Encrypted File', async t => {
-  t.plan(24)
+  t.plan(27)
 
   try {
 
@@ -96,6 +96,12 @@ test('Drive - Upload Local Encrypted File', async t => {
       const file = await drive.writeFile(`/email/rawEmailEncrypted${i}.eml`, readStream, { encrypted: true })
       t.ok(file)
     }
+
+    const stat = await drive.stat()
+    
+    t.ok(stat.file_bytes)
+    t.ok(stat.core_bytes)
+    t.ok(stat.total_bytes)
   } catch (e) {
     t.error(e)
   }
