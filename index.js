@@ -19,10 +19,6 @@ const RequestChunker = require('./util/requestChunker.js')
 const WorkerKeyPairs = require('./util/workerKeyPairs.js')
 const isOnline = require('is-online')
 const BSON = require('bson')
-const levelup = require('levelup')
-const leveldown = require('leveldown')
-const encode = require('encoding-down')
-const util = require('util')
 const FileDB = require('./util/filedb.util')
 
 const HASH_OUTPUT_LENGTH = 32 // bytes
