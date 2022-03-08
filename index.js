@@ -142,11 +142,11 @@ class Drive extends EventEmitter {
   async ready() {
     await this._bootstrap()
 
-    const stat = this._localDB.get('stat')
+    const stat = await this._localDB.get('stat')
 
     if(!stat) {
       await this.database._updateStatBytes(0)
-      this._localDB.put('stat', { ...this.stat })
+      await this._localDB.put('stat', { ...this.stat })
     } else {
       this.stat = stat
     }
@@ -188,7 +188,7 @@ class Drive extends EventEmitter {
     })
 
     if(!this.blind) {
-      const lastCollectionSeq = this._localDB.get('collection-lastSeq')
+      const lastCollectionSeq = await this._localDB.get('collection-lastSeq')
 
       const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
 
@@ -197,7 +197,7 @@ class Drive extends EventEmitter {
 
           if(lastCollectionSeq && lastCollectionSeq.seq && data.seq < lastCollectionSeq.seq) return
           
-          this._localDB.put('collection-lastSeq', { seq: data.seq })
+          await this._localDB.put('collection-lastSeq', { seq: data.seq })
           const op = HyperbeeMessages.Node.decode(data.value)
           const key = op.key.toString('utf8')
           let collection
@@ -296,22 +296,22 @@ class Drive extends EventEmitter {
   }
 
   async addPeer(peerKey) {
-    const remotePeers = this._localDB.get('remotePeers')
+    const remotePeers = await this._localDB.get('remotePeers')
 
     const peers = [...remotePeers.value, peerKey]
 
-    this._localDB.put('remotePeers', { ...peers })
+    await this._localDB.put('remotePeers', { ...peers })
 
     await this.database.addInput(peerKey)
   }
 
   // Remove Peer
   async removePeer(peerKey) {
-    let remotePeers = this._localDB.get('remotePeers')
+    let remotePeers = await this._localDB.get('remotePeers')
 
     const peers = remotePeers.filter(peer => peer !== peerKey)
 
-    this._localDB.put('remotePeers', { ...peers })
+    await this._localDB.put('remotePeers', { ...peers })
 
     await this.database.removeInput(peerKey)
   }
@@ -510,7 +510,7 @@ class Drive extends EventEmitter {
       for (let file of batch) {
         
         if(typeof file.size === 'number') await this.database._updateStatBytes(file.size)
-        const stat = this._localDB.get('stat')
+        const stat = await this._localDB.get('stat')
         if(stat.total_bytes <= this.storageMaxBytes) {
           requests.push(new Promise(async (resolve, reject) => {
             if (file.discovery_key) {
@@ -707,7 +707,7 @@ class Drive extends EventEmitter {
   async _update(data) {
     let lastMetaSeq
 
-    lastMetaSeq = this._localDB.get('meta-lastSeq')
+    lastMetaSeq = await this._localDB.get('meta-lastSeq')
 
     if (!lastMetaSeq || !lastMetaSeq.seq) lastMetaSeq = { seq: null }
     
@@ -720,8 +720,8 @@ class Drive extends EventEmitter {
     ) {
       if (data.value.hash) {
         try {
-          this._localDB.put('meta-lastSeq', { seq: data.seq })
-          const stat = this._localDB.get('stat')
+          await this._localDB.put('meta-lastSeq', { seq: data.seq })
+          const stat = await this._localDB.get('stat')
           
           if(stat.total_bytes <= this.storageMaxBytes) {  
             this.requestQueue.addFile(data.value)
