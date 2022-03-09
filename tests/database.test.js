@@ -71,7 +71,33 @@ test('Database - Test put/get', async t => {
 })
 
 test('Database - Full text search', async t => {
+  t.plan(3)
+
   const corpus = [
+    {
+      title: 'Painting 1',
+      text_body: "In your world you can create anything you desire."
+    },
+    {
+      title: 'Painting 2',
+      text_body: "I thought today we would make a happy little stream that's just running through the woods here."
+    },
+    {
+      title: 'Painting 3',
+      text_body: "See. We take the corner of the brush and let it play back-and-forth. No pressure. Just relax and watch it happen."
+    },
+    {
+      title: 'Painting 4',
+      text_body: "Just go back and put one little more happy tree in there. Without washing the brush, I'm gonna go right into some Van Dyke Brown."
+    },
+    {
+      title: 'Painting 5',
+      text_body: "Trees get lonely too, so we'll give him a little friend. If what you're doing doesn't make you happy - you're doing the wrong thing."
+    },
+    {
+      title: 'Painting 6',
+      text_body: "Son of a gun. We're not trying to teach you a thing to copy. We're just here to teach you a technique, then let you loose into the world."
+    },
     {
       title: 'Painting 1',
       text_body: "In your world you can create anything you desire."
@@ -116,23 +142,24 @@ test('Database - Full text search', async t => {
     for(const data of corpus) {
       const doc = await collection.insert({ title: data.title, text_body: data.text_body })
       inserted.push(doc)
+      collection.ftsIndex(['text_body', 'title'], [doc])
     }
-
-    await collection.ftsIndex(['text_body', 'title'], inserted)
  
-    await collection.remove({ title: 'Painting 2' })   
+    setTimeout(async() => {
+      await collection.remove({ title: 'Painting 2' })   
 
-    const q1 = await collection.search("happy tree")
+      const q1 = await collection.search("happy tree")
 
-    t.equals(q1.length, 2)
+      t.equals(q1.length, 5)
 
-    const q2 = await collection.search("happy tree", { limit: 1 })
+      const q2 = await collection.search("happy tree", { limit: 1 })
 
-    t.equals(q2.length, 1)
+      t.equals(q2.length, 1)
 
-    const q3 = await collection.search("noresults")
+      const q3 = await collection.search("noresults")
 
-    t.equals(q3.length, 0)
+      t.equals(q3.length, 0)
+    })
   } catch (err) {
     t.error(err)
   }
