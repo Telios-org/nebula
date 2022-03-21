@@ -11,6 +11,7 @@ const Swarm = require('./lib/swarm')
 const stream = require('stream')
 const blake = require('blakejs')
 const Hyperswarm = require('hyperswarm')
+const DHT = require('@hyperswarm/dht')
 const HyperbeeMessages = require('hyperbee/lib/messages.js')
 const MemoryStream = require('memorystream')
 const { v4: uuidv4 } = require('uuid')
@@ -58,7 +59,7 @@ class Drive extends EventEmitter {
     this.swarmOpts = swarmOpts
     this.publicKey = null
     this.peerPubKey = peerPubKey 
-    this.keyPair = keyPair 
+    this.keyPair = keyPair ? keyPair : DHT.keyPair()
     this.writable = writable
     this.fullTextSearch = fullTextSearch 
     this.fileTimeout = fileTimeout || FILE_TIMEOUT
@@ -72,12 +73,12 @@ class Drive extends EventEmitter {
     }
     this.blind = blind ? blind : false
     this.storageMaxBytes = storageMaxBytes || Infinity
-    
 
     // When using custom storage, transform drive path into beginning of the storage namespace
     this.storageName = drivePath.slice(drivePath.lastIndexOf('/') + 1, drivePath.length)
   
-    this._localCore = new Hypercore(this.storage || path.join(drivePath, `./LocalCore`), { storageNamespace: `${this.storageName}:local-core` })
+    this._localCore = null
+    this._localHB = null // Optional datastore for storing encrypted data locally. This will not sync with peers or be replicated.
     this._swarm = null
     this._workerKeyPairs = new WorkerKeyPairs(FILE_BATCH_SIZE)
     this._collections = {}
@@ -242,6 +243,7 @@ class Drive extends EventEmitter {
 
     this._swarm = new Swarm({
       keyPair: this.keyPair,
+      blind: this.blind,
       workerKeyPairs: this._workerKeyPairs.keyPairs,
       topic: this.discoveryKey,
       publicKey: this.peerPubKey || this.publicKey,
@@ -266,11 +268,12 @@ class Drive extends EventEmitter {
       })
     }
 
-
-    this._swarm.on('message', (peerPubKey, data) => {
-      this.emit('message', peerPubKey, data)
-    })
-
+    if(!this.blind) {
+      this._swarm.on('message', (peerPubKey, data) => {
+        this.emit('message', peerPubKey, data)
+      })
+    }
+    
     this._swarm.on('file-requested', socket => {
       socket.once('data', async data => {
         const fileHash = data.toString('utf-8')
@@ -287,7 +290,7 @@ class Drive extends EventEmitter {
           })
         }
       })
-
+      
       socket.on('error', (err) => {
         // handle errors
       })
@@ -659,6 +662,12 @@ class Drive extends EventEmitter {
   }
 
   async _bootstrap() {
+    if(!this.blind) {
+      this._localCore = new Hypercore(path.join(this.drivePath, `./LocalCore`), { storageNamespace: `${this.storageName}:local-core` })
+      await this._localCore.ready()
+      this._localHB = new Hyperbee(this._localCore, { keyEncoding: 'utf8', valueEncoding: 'json' })
+    }
+    
     this._localDB = new FileDB(`${this.drivePath}/LocalDS`)
 
     this.database = new Database(this.storage || this.drivePath, {
@@ -773,8 +782,13 @@ class Drive extends EventEmitter {
     if(this.joinSwarm) {
       await this._swarm.close()
     }
+
+    if(this._localCore) {
+      await this._localCore.close()
+    }
+
     await this.database.close()
-    await this._localCore.close()
+
     clearInterval(this._checkInternetInt)
 
     this.network = {

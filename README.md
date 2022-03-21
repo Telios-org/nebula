@@ -36,7 +36,7 @@ npm i @telios/nebula
  * 
  ******************************************************/
 
-const Drive = require('nebula-drive')
+const Drive = require('@telios/nebula')
 
 // Optionally pass in an encryption key to encrypt the drive's databases
 const encryptionKey = Buffer.alloc(32, 'hello world')
