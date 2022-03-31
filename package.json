@@ -1,6 +1,6 @@
 {
   "name": "@telios/nebula",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "Real-time distributed file and data storage.",
   "main": "index.js",
   "scripts": {
@@ -24,13 +24,13 @@
     "blakejs": "^1.1.0",
     "codecs": "^2.2.0",
     "concat-stream": "^2.0.0",
-    "corestore": "^6.0.1-alpha.9",
+    "corestore": "6.0.1-alpha.9",
     "dat-encoding": "^5.0.1",
     "graceful-fs": "^4.2.9",
     "hyperbee": "^1.6.3",
     "hyperbeedeebee": "git+https://github.com/hexadecible/hyperbeedeebee.git",
     "hypercore": "10.0.0-alpha.23",
-    "hyperswarm": "^3.0.1",
+    "hyperswarm": "3.0.2",
     "is-online": "^9.0.1",
     "memorystream": "^0.3.1",
     "natural": "^5.1.11",
