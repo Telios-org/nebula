@@ -98,7 +98,7 @@ test('Drive - Upload Local Encrypted File', async t => {
     }
 
     const stat = await drive.stat()
-    
+
     t.ok(stat.file_bytes)
     t.ok(stat.core_bytes)
     t.ok(stat.total_bytes)
@@ -161,10 +161,7 @@ test('Drive - Create Seed Peer with Max Storage of 12mb', async t => {
     }
   })
 
-
-
   await drive6.ready()
-
 
   drive6.on('file-sync', async (file) => {
     t.ok(file.uuid, `File has synced from remote peer`)
@@ -193,7 +190,7 @@ test('Drive - Fetch Files from Remote Drive', async t => {
       })
 
       stream.on('error', (err) => {
-        t.error(err, err.message)
+        t.fail(err, err.message)
         resolve()
       })
 
@@ -299,14 +296,18 @@ test('Drive - Receive messages', async t => {
 // })
 
 test.onFinish(async () => {
-  await drive.close()
-  await drive2.close()
-  await drive3.close()
-  await drive4.close()
-  await drive5.close()
-  await drive6.close()
+  try {
+    await drive.close()
+    await drive2.close()
+    await drive3.close()
+    await drive4.close()
+    await drive5.close()
+    await drive6.close()
 
-  await cleanup()
+    // await cleanup()
+  } catch(err) {
+    console.log(err)
+  }
 
   process.exit(0)
 })

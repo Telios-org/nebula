@@ -114,8 +114,9 @@ class Drive extends EventEmitter {
           pump(stream, writeStream, (err) => {
             if (err) reject(err)
 
-            setTimeout(() => {
+            setTimeout(async () => {
               this.emit('file-sync', file)
+              await this._localHB.put(file.uuid, {})
             })
 
             resolve()
@@ -144,11 +145,11 @@ class Drive extends EventEmitter {
   async ready() {
     await this._bootstrap()
 
-    const stat = await this._localDB.get('stat')
+    const stat = this._localDB.get('stat')
 
     if(!stat) {
       await this.database._updateStatBytes(0)
-      await this._localDB.put('stat', { ...this._stat })
+      this._localDB.put('stat', { ...this._stat })
     } else {
       this._stat = stat
     }
@@ -190,7 +191,7 @@ class Drive extends EventEmitter {
     })
 
     if(!this.blind) {
-      const lastCollectionSeq = await this._localDB.get('collection-lastSeq')
+      const lastCollectionSeq = this._localDB.get('collection-lastSeq')
 
       const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
 
@@ -199,7 +200,7 @@ class Drive extends EventEmitter {
 
           if(lastCollectionSeq && lastCollectionSeq.seq && data.seq < lastCollectionSeq.seq) return
           
-          await this._localDB.put('collection-lastSeq', { seq: data.seq })
+          this._localDB.put('collection-lastSeq', { seq: data.seq })
           const op = HyperbeeMessages.Node.decode(data.value)
           const key = op.key.toString('utf8')
           let collection
@@ -300,22 +301,22 @@ class Drive extends EventEmitter {
   }
 
   async addPeer(peerKey) {
-    const remotePeers = await this._localDB.get('remotePeers')
+    const remotePeers = this._localDB.get('remotePeers')
 
     const peers = [...remotePeers.value, peerKey]
 
-    await this._localDB.put('remotePeers', { ...peers })
+    this._localDB.put('remotePeers', { ...peers })
 
     await this.database.addInput(peerKey)
   }
 
   // Remove Peer
   async removePeer(peerKey) {
-    let remotePeers = await this._localDB.get('remotePeers')
+    let remotePeers = this._localDB.get('remotePeers')
 
     const peers = remotePeers.filter(peer => peer !== peerKey)
 
-    await this._localDB.put('remotePeers', { ...peers })
+    this._localDB.put('remotePeers', { ...peers })
 
     await this.database.removeInput(peerKey)
   }
@@ -512,9 +513,8 @@ class Drive extends EventEmitter {
       const requests = []
 
       for (let file of batch) {
-        
         if(typeof file.size === 'number') await this.database._updateStatBytes(file.size)
-        const stat = await this._localDB.get('stat')
+        const stat = this._localDB.get('stat')
         if(stat.total_bytes <= this.storageMaxBytes) {
           requests.push(new Promise(async (resolve, reject) => {
             if (file.discovery_key) {
@@ -662,11 +662,9 @@ class Drive extends EventEmitter {
   }
 
   async _bootstrap() {
-    if(!this.blind) {
-      this._localCore = new Hypercore(path.join(this.drivePath, `./LocalCore`), { storageNamespace: `${this.storageName}:local-core` })
-      await this._localCore.ready()
-      this._localHB = new Hyperbee(this._localCore, { keyEncoding: 'utf8', valueEncoding: 'json' })
-    }
+    this._localCore = new Hypercore(path.join(this.drivePath, `./LocalCore`), { storageNamespace: `${this.storageName}:local-core` })
+    await this._localCore.ready()
+    this._localHB = new Hyperbee(this._localCore, { keyEncoding: 'utf8', valueEncoding: 'json' })
     
     this._localDB = new FileDB(`${this.drivePath}/LocalDS`)
 
@@ -715,25 +713,21 @@ class Drive extends EventEmitter {
   }
 
   async _update(data) {
-    let lastMetaSeq
 
-    lastMetaSeq = await this._localDB.get('meta-lastSeq')
-
-    if (!lastMetaSeq || !lastMetaSeq.seq) lastMetaSeq = { seq: null }
-    
-    this.emit('sync')
+    const fileHash = await this._localHB.get(data.value.uuid)
 
     if (
       !data.value.deleted &&
       data.value.peer_key !== this.keyPair.publicKey.toString('hex') &&
-      lastMetaSeq.seq !== data.seq
+      !fileHash
     ) {
       if (data.value.hash) {
+        
+        this.emit('sync')
+
         try {
-          await this._localDB.put('meta-lastSeq', { seq: data.seq })
-          const stat = await this._localDB.get('stat')
-          
-          if(stat.total_bytes <= this.storageMaxBytes) {  
+          const stat = this._localDB.get('stat')
+          if(stat.total_bytes <= this.storageMaxBytes) {
             this.requestQueue.addFile(data.value)
           }
         } catch (err) {
@@ -750,7 +744,7 @@ class Drive extends EventEmitter {
         const filePath = path.join(this._filesDir, `/${data.value.uuid}`)
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath)
-
+          await this._localHB.del(data.value.uuid)
           await this.database._updateStatBytes(-Math.abs(data.value.size))
 
           setTimeout(() => {

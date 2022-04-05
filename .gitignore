@@ -120,3 +120,4 @@ tests/data/encrypted_tmp.email
 .vscode
 package-lock.json
 yarn.lock
+.DS_Store
