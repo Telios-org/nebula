@@ -304,7 +304,7 @@ test.onFinish(async () => {
     await drive5.close()
     await drive6.close()
 
-    // await cleanup()
+    await cleanup()
   } catch(err) {
     console.log(err)
   }
