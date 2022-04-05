@@ -25,7 +25,7 @@ const FileDB = require('./util/filedb.util')
 const HASH_OUTPUT_LENGTH = 32 // bytes
 const MAX_PLAINTEXT_BLOCK_SIZE = 65536
 const MAX_ENCRYPTED_BLOCK_SIZE = 65553
-const FILE_TIMEOUT = 10000 // How long to wait for the on data event when downloading a file from a remote drive.
+const FILE_TIMEOUT = 5000 // How long to wait for the on data event when downloading a file from a remote drive.
 const FILE_RETRY_ATTEMPTS = 2 // Fail to fetch file after 3 attempts
 const FILE_BATCH_SIZE = 10 // How many parallel requests are made in each file request batch
 
@@ -518,20 +518,30 @@ class Drive extends EventEmitter {
         if(stat.total_bytes <= this.storageMaxBytes) {
           requests.push(new Promise(async (resolve, reject) => {
             if (file.discovery_key) {
-              const keyPair = this._workerKeyPairs.getKeyPair()
-              const stream = await this.fetchFileByDriveHash(file.discovery_key, file.hash, { key: file.key, header: file.header, keyPair })
+              try {
+                const keyPair = this._workerKeyPairs.getKeyPair()
+                const stream = await this.fetchFileByDriveHash(file.discovery_key, file.hash, { key: file.key, header: file.header, keyPair })
 
-              await cb(stream, file)
-
-              resolve()
+                await cb(stream, file)
+                
+                return resolve()
+              } catch(err) {
+                return reject(err)
+              }
             } else {
               // TODO: Fetch files by hash
+              return reject()
             }
           }))
         }
       }
 
-      await Promise.all(requests)
+      try {
+        await Promise.all(requests)
+      } catch(err) {
+        // Could not download some files. Will try again.
+      }
+
       this.requestQueue.queue = []
     }
   }
