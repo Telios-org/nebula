@@ -753,15 +753,17 @@ class Drive extends EventEmitter {
     ) {
       try {
         const filePath = path.join(this._filesDir, `/${data.value.uuid}`)
+        
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath)
-          await this._localHB.del(data.value.uuid)
-          await this.database._updateStatBytes(-Math.abs(data.value.size))
-
-          setTimeout(() => {
-            this.emit('file-unlink', data.value)
-          })
         }
+
+        await this._localHB.del(data.value.uuid)
+        await this.database._updateStatBytes(-Math.abs(data.value.size))
+
+        setTimeout(() => {
+          this.emit('file-unlink', data.value)
+        })
       } catch (err) {
         throw err
       }
