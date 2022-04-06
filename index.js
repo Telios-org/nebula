@@ -73,6 +73,7 @@ class Drive extends EventEmitter {
     }
     this.blind = blind ? blind : false
     this.storageMaxBytes = storageMaxBytes || Infinity
+    this.opened = false
 
     // When using custom storage, transform drive path into beginning of the storage namespace
     this.storageName = drivePath.slice(drivePath.lastIndexOf('/') + 1, drivePath.length)
@@ -115,18 +116,16 @@ class Drive extends EventEmitter {
             if (err) reject(err)
 
             setTimeout(async () => {
-              this.emit('file-sync', file)
-              await this._localHB.put(file.uuid, {})
+              if(this.opened) {
+                this.emit('file-sync', file)
+                await this._localHB.put(file.uuid, {})
+              }
             })
 
             resolve()
           })
         })
       })
-    })
-
-    process.on('uncaughtException', err => {
-      // gracefully catch uncaught exceptions
     })
 
     // Periodically check this drive's connection to the internet.
@@ -548,6 +547,8 @@ class Drive extends EventEmitter {
 
   async _initFileSwarm(stream, topic, fileHash, attempts, { keyPair }) {
     return new Promise((resolve, reject) => {
+      if(!this.opened) throw ('Drive is closed.')
+
       if (attempts > this.fileRetryAttempts) {
         const err = new Error('Unable to make a connection or receive data within the allotted time.')
         err.fileHash = fileHash
@@ -813,7 +814,7 @@ class Drive extends EventEmitter {
       this.emit('network-updated', this.network)
     }
 
-    this.openend = false
+    this.opened = false
   }
 }
 
