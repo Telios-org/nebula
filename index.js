@@ -143,9 +143,9 @@ class Drive extends EventEmitter {
 
   async ready() {
     process.on('uncaughtException', (err) => {
-      throw err
+      //throw err
     })
-    
+
     await this._bootstrap()
 
     const stat = this._localDB.get('stat')
