@@ -247,7 +247,7 @@ test('Drive - Fail to Fetch Files from Remote Drive', async t => {
 })
 
 test('Drive - Unlink Local File', async t => {
-  t.plan(3)
+  t.plan(4)
 
   const drive1Size = drive.info().size
   const drive2Size = drive2.info().size
