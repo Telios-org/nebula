@@ -295,7 +295,9 @@ test('Drive - Receive messages', async t => {
 //   t.ok(drive3.info(), `Drive 3 has size ${drive3.info().size}`)
 // })
 
-test.onFinish(async () => {
+test('Drive - Close drives', async t => {
+  t.plan(1)
+
   try {
     await drive.close()
     await drive2.close()
@@ -305,10 +307,14 @@ test.onFinish(async () => {
     await drive6.close()
 
     await cleanup()
-  } catch(err) {
-    console.log(err)
-  }
 
+    t.ok(1)
+  } catch(err) {
+    t.fail(err)
+  }
+})
+
+test.onFinish(async () => {
   process.exit(0)
 })
 
