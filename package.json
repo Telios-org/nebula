@@ -1,6 +1,6 @@
 {
   "name": "@telios/nebula",
-  "version": "2.5.6",
+  "version": "2.5.7",
   "description": "Real-time distributed file and data storage.",
   "main": "index.js",
   "scripts": {
@@ -37,7 +37,7 @@
     "natural": "^5.1.11",
     "pump": "^3.0.0",
     "random-access-memory": "^3.1.1",
-    "sodium-native": "^3.2.0",
+    "sodium-javascript": "^0.8.0",
     "stopwords": "^0.0.9",
     "uuid": "^8.2.0"
   },

@@ -121,3 +121,4 @@ tests/data/encrypted_tmp.email
 package-lock.json
 yarn.lock
 .DS_Store
+scratch.js

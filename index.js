@@ -46,7 +46,8 @@ class Drive extends EventEmitter {
       joinSwarm,
       fullTextSearch, // Initialize a corestore to support full text search indexes.
       blind, // Set to true if blind mirroring another drive (you don't have the encryption key)
-      storageMaxBytes // Max size this drive will store in bytes before turning off replication/file syncing
+      storageMaxBytes, // Max size this drive will store in bytes before turning off replication/file syncing
+      syncFiles
     }
   ) {
     super()
@@ -73,6 +74,7 @@ class Drive extends EventEmitter {
     }
     this.blind = blind ? blind : false
     this.storageMaxBytes = storageMaxBytes || Infinity
+    this.syncFiles = syncFiles || true
     this.opened = false
 
     // When using custom storage, transform drive path into beginning of the storage namespace
@@ -176,22 +178,24 @@ class Drive extends EventEmitter {
       await this.connect()
     }
 
-    const stream = this.metadb.createReadStream({ live: true })
-    
-    stream.on('data', async data => {
-      if(data.value.toString().indexOf('hyperbee') === -1) {
-        const op = HyperbeeMessages.Node.decode(data.value)
-        const node = {
-          key: op.key.toString('utf8'),
-          value: JSON.parse(op.value.toString('utf8')),
-          seq: data.seq
+    if(this.syncFiles) {
+      const stream = this.metadb.createReadStream({ live: true })
+      
+      stream.on('data', async data => {
+        if(data.value.toString().indexOf('hyperbee') === -1) {
+          const op = HyperbeeMessages.Node.decode(data.value)
+          const node = {
+            key: op.key.toString('utf8'),
+            value: JSON.parse(op.value.toString('utf8')),
+            seq: data.seq
+          }
+  
+          if (node.key !== '__peers') {
+            await this._update(node)
+          }
         }
- 
-        if (node.key !== '__peers') {
-          await this._update(node)
-        }
-      }
-    })
+      })
+    }
 
     if(!this.blind) {
       const lastCollectionSeq = this._localDB.get('collection-lastSeq')

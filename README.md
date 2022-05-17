@@ -144,6 +144,7 @@ Options include:
     publicKey, 
     secretKey
   },
+  syncFiles: true | false // Sync all files from peer drives
   joinSwarm: true | false // Optionally set whether or not to join hyperswarm when starting the drive. Defaults to true.
   swarmOpts: { // Set server to true to start this drive as a server and announce its public key to the network
     server: true | false,
