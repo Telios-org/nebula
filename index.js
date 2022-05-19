@@ -47,7 +47,7 @@ class Drive extends EventEmitter {
       fullTextSearch, // Initialize a corestore to support full text search indexes.
       blind, // Set to true if blind mirroring another drive (you don't have the encryption key)
       storageMaxBytes, // Max size this drive will store in bytes before turning off replication/file syncing
-      syncFiles
+      syncFiles = true
     }
   ) {
     super()
@@ -72,9 +72,10 @@ class Drive extends EventEmitter {
       internet: false,
       drive: false
     }
+
     this.blind = blind ? blind : false
     this.storageMaxBytes = storageMaxBytes || Infinity
-    this.syncFiles = syncFiles || true
+    this.syncFiles = syncFiles
     this.opened = false
 
     // When using custom storage, transform drive path into beginning of the storage namespace
