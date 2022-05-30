@@ -54,12 +54,13 @@ class Drive extends EventEmitter {
 
     this.storage = storage
     this.encryptionKey = encryptionKey
-    this.database = null;
+    this.database = null
     this.db = null;
     this.drivePath = drivePath
     this.swarmOpts = swarmOpts
     this.publicKey = null
     this.peerPubKey = peerPubKey 
+    this.peerWriterKey = null
     this.keyPair = keyPair ? keyPair : DHT.keyPair()
     this.writable = writable
     this.fullTextSearch = fullTextSearch 
@@ -68,13 +69,14 @@ class Drive extends EventEmitter {
     this.requestQueue = new RequestChunker(null, FILE_BATCH_SIZE)
     this.checkNetworkStatus = checkNetworkStatus
     this.joinSwarm = typeof joinSwarm === 'boolean' ? joinSwarm : true
+    this.peers = new Set()
     this.network = {
       internet: false,
       drive: false
     }
 
     this.blind = blind ? blind : false
-    this.storageMaxBytes = storageMaxBytes || Infinity
+    this.storageMaxBytes = storageMaxBytes || false
     this.syncFiles = syncFiles
     this.opened = false
 
@@ -161,6 +163,7 @@ class Drive extends EventEmitter {
     }
 
     this.publicKey = this.database.localMetaCore.key.toString('hex')
+    this.peerWriterKey = this.database.localInput.key.toString('hex')
 
     if (this.peerPubKey) {
       this.discoveryKey = createTopicHash(this.peerPubKey).toString('hex')
@@ -205,7 +208,6 @@ class Drive extends EventEmitter {
 
       cStream.on('data', async data => {
         if(data.value.toString().indexOf('hyperbee') === -1) {
-
           if(lastCollectionSeq && lastCollectionSeq.seq && data.seq < lastCollectionSeq.seq) return
           
           this._localDB.put('collection-lastSeq', { seq: data.seq })
@@ -227,9 +229,14 @@ class Drive extends EventEmitter {
           if(value && value._id) {
             const node = {
               collection,
-              _id: value._id.toString('hex'),
-              author: value.author
+              value: {
+                ...value,
+                _id: value._id.toString('hex')
+              }
             }
+
+            if(this.storageMaxBytes) await this.database._updateStatBytes()
+            
             this.emit('collection-update', node)
           }
         }
@@ -240,6 +247,20 @@ class Drive extends EventEmitter {
         this.emit('collection-update')
       })
     }
+
+    this.database.on('peer-connected', (peer) => {
+      if(!this.peers.has(peer.peerPubKey)) {
+        this.emit('peer-connected', peer)
+        this.peers.add(peer.peerPubKey)
+      }
+    })
+
+    this.database.on('peer-disconnected', (peer) => {
+      if(this.peers.has(peer.peerPubKey)) {
+        this.emit('peer-disconnected', peer)
+        this.peers.delete(peer.peerPubKey)
+      }
+    })
 
     this.opened = true
   }
@@ -258,7 +279,17 @@ class Drive extends EventEmitter {
       publicKey: this.peerPubKey || this.publicKey,
       isServer: this.swarmOpts.server,
       isClient: this.swarmOpts.client,
-      acl: this.swarmOpts.acl
+      acl: this.swarmOpts.acl,
+    })
+
+    this._swarm.on('peer-connected', socket => {
+      socket.write({
+        drivePubKey: this.peerPubKey || this.publicKey,
+        peerPubKey: this.keyPair.publicKey.toString('hex'),
+        blind: this.blind,
+        writer: this.peerWriterKey,
+        meta: this.publicKey
+      })
     })
 
     if(this.checkNetworkStatus) {
@@ -277,12 +308,26 @@ class Drive extends EventEmitter {
       })
     }
 
-    if(!this.blind) {
-      this._swarm.on('message', (peerPubKey, data) => {
+
+    this._swarm.on('message', async (peerPubKey, data) => {
+      try {
+        const msg = JSON.parse(data.toString())
+        if(msg && msg.type === 'sync') {
+          const drivePubKey = this.peerPubKey || this.publicKey
+
+          if(msg.meta.drivePubKey === drivePubKey) {
+            await this.addPeer(msg.meta)
+          } else {
+            // ACCESS DENIED
+          }
+        }
+
         this.emit('message', peerPubKey, data)
-      })
-    }
-    
+      } catch(err) {
+        console.log(err)
+      }
+    })
+
     this._swarm.on('file-requested', socket => {
       socket.once('data', async data => {
         const fileHash = data.toString('utf-8')
@@ -308,25 +353,31 @@ class Drive extends EventEmitter {
     this._swarm.ready()
   }
 
-  async addPeer(peerKey) {
-    const remotePeers = this._localDB.get('remotePeers')
+  async addPeer(peer) {
+    await this.database.metadb.put(`__peer:${peer.publicKey}`, {
+      blacklisted: false,
+      peerPubKey: peer.publicKey,
+      blind: peer.blind,
+      cores: {
+        writer: peer.writer,
+        meta: peer.meta
+      }
+    })
 
-    const peers = [...remotePeers.value, peerKey]
-
-    this._localDB.put('remotePeers', { ...peers })
-
-    await this.database.addInput(peerKey)
+    await this.database.addRemotePeer(peer)
   }
 
   // Remove Peer
-  async removePeer(peerKey) {
-    let remotePeers = this._localDB.get('remotePeers')
-
-    const peers = remotePeers.filter(peer => peer !== peerKey)
-
-    this._localDB.put('remotePeers', { ...peers })
-
-    await this.database.removeInput(peerKey)
+  async removePeer(peer) {
+    await this.database.metadb.put(`__peer:${peer.publicKey}`, {
+      blacklisted: true,
+      peerPubKey: peer.publicKey,
+      blind: peer.blind,
+      cores: {
+        writer: peer.writer,
+        meta: peer.meta
+      }
+    })
   }
 
   async writeFile(path, readStream, opts = {}) {
@@ -523,7 +574,7 @@ class Drive extends EventEmitter {
       for (let file of batch) {
         if(typeof file.size === 'number') await this.database._updateStatBytes(file.size)
         const stat = this._localDB.get('stat')
-        if(stat.total_bytes <= this.storageMaxBytes) {
+        if(stat.total_bytes <= this.storageMaxBytes || !this.storageMaxBytes) {
           requests.push(new Promise(async (resolve, reject) => {
             if (file.discovery_key) {
               try {
@@ -608,6 +659,7 @@ class Drive extends EventEmitter {
       setTimeout(async () => {
         if (!connected || streamError || !receivedData) {
           attempts += 1
+
           await swarm.leave(topic)
           await swarm.destroy()
 
@@ -747,7 +799,7 @@ class Drive extends EventEmitter {
 
         try {
           const stat = this._localDB.get('stat')
-          if(stat.total_bytes <= this.storageMaxBytes) {
+          if(stat.total_bytes <= this.storageMaxBytes || !this.storageMaxBytes) {
             this.requestQueue.addFile(data.value)
           }
         } catch (err) {
@@ -824,6 +876,10 @@ class Drive extends EventEmitter {
 
       this.emit('network-updated', this.network)
     }
+
+    this.removeAllListeners()
+    this.requestQueue.removeAllListeners()
+    this._swarm.removeAllListeners()
 
     this.opened = false
   }

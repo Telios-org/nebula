@@ -110,6 +110,7 @@ core/
 tests/storage
 tests/localDrive
 tests/drive*
+tests/peer*
 !tests/drive.*
 tests/peer-drive
 tests/data/meta/*

@@ -184,14 +184,35 @@ const remoteDrive = new Drive(__dirname + "/drive_remote", drivePubKey, {
 
 await remoteDrive.ready()
 ```
+#### `drive.publicKey`
+
+The drive's `publicKey` should ONLY be given to remote peers you would like to replicate with. All peers with this key will have write access to your drive's metadata (peers this drive connects to and generic file data). The publicKey + the drive's encryption key will give peers full write access.
+
+#### `drive.peerWriterKey`
+
+The key of this drive's primary writer Hypercore. This key can be used for adding and removing this drive as a remote peer.
+
+#### `drive.peers`
+
+A Set containing the public keys of all connected peers.
+
+#### `drive.encryptionKey`
+
+The drive's symmetric key used for encrypting the writer hypercores. Share this key with trusted peers only and as they will have full write access.
 
 #### `await drive.ready()`
 
 Initialize the drive and all resources needed.
 
-#### `await drive.addPeer(publicKey)`
+#### `await drive.addPeer(peer)`
 
-Adds a remote drive as a new writer. After a peer has been added, the drive will automatically try to reconnect to this peer after every restart.
+Adds a remote drive as a new writer. After a peer has been added, the drive will automatically try to reconnect to this peer after every restart. Drives automatically add remote peers that initialized their drives with a public key so this rarely needs to be manually called. 
+
+- `peer`
+  - `blind`: true | false `drive.blind`
+  - `publicKey`: The remote peer's public key `drive.publicKey`
+  - `writer`: The remote peer's writer core public key `drive.peerWriter`
+  - `meta`: The remote peer's meta core public key `drive.publicKey`
 
 Example Usage:
 
@@ -206,7 +227,7 @@ const drive1 = new Drive(__dirname + "/drive", null, {
 })
 
 // Local drive on Device B
-const drive2 = new Drive(__dirname + "/drive", null, { 
+const drive2 = new Drive(__dirname + "/drive", drive1.publicKey, { 
   keyPair,
   swarmOpts: {
     server: true,
@@ -214,14 +235,35 @@ const drive2 = new Drive(__dirname + "/drive", null, {
   }
 })
 
-
-await drive2.addPeer(drive1.publicKey)
+// Writer and meta keys need to be exchanged between both devices for bi-directional writing.
+// Drive2 already includes drive1 as a peer because it was initialized with drive1's publicKey
+await drive1.addPeer({
+  blind: drive2.blind,
+  publicKey: drive2.publickey,
+  writer: drive2.peerWriter,
+  meta: drive2.publicKey
+})
 ```
 
-#### `await drive.removePeer(publicKey)`
+#### `await drive.removePeer(peer)`
 
 Stop replicating with another drive peer.
 
+- `peer`
+  - `blind`: true | false `drive.blind`
+  - `publicKey`: The remote peer's public key `drive.publicKey`
+  - `writer`: The remote peer's writer core public key `drive.peerWriter`
+  - `meta`: The remote peer's meta core public key `drive.publicKey`
+
+```js
+
+await drive1.removePeer({
+  blind: drive1.blind,
+  publicKey: drive1.publickey,
+  writer: drive1.peerWriter,
+  meta: drive1.publicKey
+})
+```
 
 #### `const file = await drive.writeFile(path, readableStream, [opts])`
 
@@ -323,8 +365,7 @@ Emitted when a collection has received an update from a remote peer
 
 - `item`
   - `collection`: The collection that was updated
-  - `_id`: The updated document's _id
-  - `author`: Public key of the peer who commited the update  
+  - `value`: JSON value of the new update
 
 #### `drive.on('file-add', (file, enc) => {})`
 
@@ -339,7 +380,7 @@ Emitted when a new file has been added to a local drive.
 
 #### `drive.on('sync', () => {})` 
 
-Emitted when the drive has synced any remote data.
+Emitted when the drive has synced remote data.
 
 #### `drive.on('file-sync', (file) => {})`
 
@@ -351,7 +392,7 @@ Emitted when a file has been deleted on the drive.
 
 #### `drive.on('fetch-error', (err) => {})`
 
-Emitted when there has been an error downloading from the remote drive
+Emitted when there has been an error downloading from the remote drive.
 
 #### `drive.on('network-updated', (network) => {})`
 
@@ -361,6 +402,14 @@ Returns:
 - `network`
   - `internet`: true|false
   - `drive`: true|false
+
+#### `drive.on('peer-connected', (peer) => {})`
+
+Emitted when a remote peer connects and starts replicating.
+
+#### `drive.on('peer-disconnected', (peer) => {})`
+
+Emitted when a remote peer disconnects.
 
 ## Drive Database API
 Drive databases mimic the MongoDB API. Full API documentation can be found on [Hyperbeedeebee](https://github.com/RangerMauve/hyperbeedeebee)

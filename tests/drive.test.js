@@ -31,6 +31,8 @@ test('Drive - Create', async t => {
 
   await cleanup()
 
+  await peerCleanup()
+
   drive = new Drive(__dirname + '/drive', null, {
     storage: ram,
     keyPair,
@@ -148,6 +150,262 @@ test('Drive - Create Seed Peer', async t => {
   hyperFiles.push(file)
 })
 
+test('Drive - Sync Remote Database Updates from blind peer', async t => {
+  t.plan(2)
+
+  try {
+    const encKey = Buffer.alloc(32, 'hello world')
+
+    const peer1 = new Drive(__dirname + '/peer1', null, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await peer1.ready()
+
+    // BLIND PEER DOES NOT HAVE ENCRYPTION KEY
+    const peer2 = new Drive(__dirname + '/peer2', peer1.publicKey, {
+      keyPair: DHT.keyPair(),
+      blind: true,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await peer2.ready()
+
+    // Sync remote updates from offline peer1 via blind peer2
+    const peer3 = new Drive(__dirname + '/peer3', peer1.publicKey, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    peer1.on('collection-update', async data => {
+      if(data.value.foo) {
+        t.ok(data.value.foo, 'peer 1 has value foo')
+      }
+    })
+
+    peer2.on('collection-update', async data => {
+      await peer1.close()
+      await peer3.ready()
+    })
+
+    peer3.on('collection-update', async data => {
+      if(data.value.foo) {
+        t.ok(data.value.foo, 'peer 3 has value foo')
+      }
+    })
+
+    const collection1 = await peer1.db.collection('example')
+    await collection1.insert({ foo: 'bar' })
+
+    t.teardown(async () => {
+      try {
+        await closeCores([peer2, peer3])
+        await peerCleanup()
+      } catch(err) {
+        console.log(err)
+      }
+    })
+  } catch(err) {
+    console.log(err)
+  }
+})
+
+test('Drive - Sync Remote Database Updates', async t => {
+  t.plan(6)
+
+  try {
+    const encKey = Buffer.alloc(32, 'hello world')
+
+    const peer1 = new Drive(__dirname + '/peer1', null, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await peer1.ready()
+
+    const peer2 = new Drive(__dirname + '/peer2', peer1.publicKey, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await peer2.ready()
+
+    const peer3 = new Drive(__dirname + '/peer3', peer1.publicKey, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await peer3.ready()
+
+    peer1.on('collection-update', async data => {
+      if(data.value.foo) {
+        t.ok(data.value.foo, 'peer 1 has value foo')
+      }
+
+      if(data.value.hello) {
+        t.ok(data.value.hello, 'peer 1 has value hello')
+      }
+    })
+
+    peer2.on('collection-update', data => {
+      if(data.value.foo) {
+        t.ok(data.value.foo, 'peer 2 has value foo')
+      }
+
+      if(data.value.hello) {
+        t.ok(data.value.hello, 'peer 2 has value hello')
+      }
+    })
+
+    peer3.on('collection-update', async data => {
+      if(data.value.foo) {
+        t.ok(data.value.foo, 'peer 3 has value foo')
+      }
+
+      if(data.value.hello) {
+        t.ok(data.value.hello, 'peer 3 has value hello')
+      }
+    })
+
+    const collection1 = await peer1.db.collection('example')
+    await collection1.insert({ foo: 'bar' })
+
+    const collection3 = await peer3.db.collection('example')
+    await collection3.insert({ hello: 'world' })
+
+    t.teardown(async () => {
+      try {
+        await closeCores([peer1, peer2, peer3])
+        await peerCleanup()
+      } catch(err) {
+        console.log(err)
+      }
+    })
+  } catch(err) {
+    console.log(err)
+  }
+})
+
+test('Drive - Remove remote peer', async t => {
+  t.plan(2)
+  try {
+    const encKey = Buffer.alloc(32, 'hello world')
+
+    const peer1 = new Drive(__dirname + '/peer1', null, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await peer1.ready()
+
+    const peer2 = new Drive(__dirname + '/peer2', peer1.publicKey, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await peer2.ready()
+
+    const peer3 = new Drive(__dirname + '/peer3', peer1.publicKey, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await peer3.ready()
+
+    const collection1 = await peer1.db.collection('example')
+    await collection1.insert({ foo: 'bar' })
+
+    const collection2 = await peer2.db.collection('example')
+    await collection2.insert({ bar: 'foo' })
+
+    const collection3 = await peer3.db.collection('example')
+    await collection3.insert({ hello: 'world' })
+    
+    const peer4 = new Drive(__dirname + '/peer4', peer1.publicKey, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    peer4.on('collection-update', async data => {
+      if(data.value.bar) {
+        t.fail('Should not sync data from removed peer!')
+      }
+
+      if(data.value.foo) {
+        t.ok(data.value.foo, 'peer 4 has value foo')
+      }
+
+      if(data.value.hello) {
+        t.ok(data.value.hello, 'peer 4 has value hello')
+      }
+    })
+
+    peer1.on('collection-update', async data => {
+      if(data.value.hello === 'world') {
+        await peer1.removePeer({
+          blind: peer2.blind,
+          publicKey: peer2.publicKey,
+          writer: peer2.peerWriterKey, 
+          meta: peer2.publicKey
+        })
+
+        await peer4.ready()
+      }
+    })
+
+    t.teardown(async () => {
+      try {
+        await closeCores([peer1, peer2, peer3, peer4])
+        await peerCleanup()
+      } catch(err) {
+        console.log(err)
+      }
+    })
+  } catch(err) {
+    console.log(err)
+  }
+})
+
 test('Drive - Create Seed Peer with Max Storage of 12mb', async t => {
   t.plan(4)
   
@@ -173,6 +431,7 @@ test('Drive - Fetch Files from Remote Drive', async t => {
 
   drive3 = new Drive(__dirname + '/drive3', null, {
     keyPair: keyPair3,
+    fileRetryAttempts: 10,
     swarmOpts: {
       server: true,
       client: true
@@ -253,7 +512,7 @@ test('Drive - Unlink Local File', async t => {
   const drive2Size = drive2.info().size
 
   drive2.on('collection-update', async data => {
-    t.ok(data._id)
+    t.ok(data.value._id)
   })
 
   drive.on('file-unlink', file => {
@@ -266,7 +525,6 @@ test('Drive - Unlink Local File', async t => {
 
   await drive.unlink('/email/rawEmailEncrypted.eml')
 })
-
 
 test('Drive - Receive messages', async t => {
   t.plan(1)
@@ -355,4 +613,50 @@ async function cleanup() {
       path.join(__dirname, '/drive6')
     ])
   }
+}
+
+async function peerCleanup() {
+  if (fs.existsSync(path.join(__dirname, '/peer1'))) {
+    await del([
+      path.join(__dirname, '/peer1')
+    ])
+  }
+
+  if (fs.existsSync(path.join(__dirname, '/peer2'))) {
+    await del([
+      path.join(__dirname, '/peer2')
+    ])
+  }
+
+  if (fs.existsSync(path.join(__dirname, '/peer3'))) {
+    await del([
+      path.join(__dirname, '/peer3')
+    ])
+  }
+
+  if (fs.existsSync(path.join(__dirname, '/peer4'))) {
+    await del([
+      path.join(__dirname, '/peer4')
+    ])
+  }
+}
+
+async function closeCores(cores) {
+  const promises = []
+
+  for(const core of cores) {
+    promises.push(new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          await core.close()
+          resolve()
+        } catch(err) {
+          console.log(err)
+          reject(err)
+        }
+      })
+    }))
+  }
+
+  return Promise.all(promises)
 }
