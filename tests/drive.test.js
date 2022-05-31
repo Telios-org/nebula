@@ -140,6 +140,7 @@ test('Drive - Create Seed Peer', async t => {
 
   await drive2.ready()
 
+  
   drive2.on('file-sync', async (file) => {
     t.ok(file.uuid, `File has synced from remote peer`)
   })
@@ -213,6 +214,7 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
       try {
         await closeCores([peer2, peer3])
         await peerCleanup()
+        process.removeAllListeners()
       } catch(err) {
         console.log(err)
       }
@@ -301,6 +303,7 @@ test('Drive - Sync Remote Database Updates', async t => {
       try {
         await closeCores([peer1, peer2, peer3])
         await peerCleanup()
+        process.removeAllListeners()
       } catch(err) {
         console.log(err)
       }
@@ -397,6 +400,7 @@ test('Drive - Remove remote peer', async t => {
       try {
         await closeCores([peer1, peer2, peer3, peer4])
         await peerCleanup()
+        process.removeAllListeners()
       } catch(err) {
         console.log(err)
       }
