@@ -147,9 +147,13 @@ class Drive extends EventEmitter {
   }
 
   async ready() {
-    process.on('uncaughtException', (err) => {
-      //throw err
-    })
+    const uncaughtCount = process.listenerCount('uncaughtException')
+
+    if(uncaughtCount === 0) {
+      process.on('uncaughtException', (err) => {
+        //throw err
+      })
+    }
 
     await this._bootstrap()
 
