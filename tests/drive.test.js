@@ -152,7 +152,7 @@ test('Drive - Create Seed Peer', async t => {
 })
 
 test('Drive - Sync Remote Database Updates from blind peer', async t => {
-  t.plan(2)
+  t.plan(3)
 
   try {
     const encKey = Buffer.alloc(32, 'hello world')
@@ -168,10 +168,15 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
 
     await peer1.ready()
 
+    const readStream = fs.createReadStream(path.join(__dirname, '/data/test.doc'))
+    const file = await peer1.writeFile('/test.doc', readStream)
+
     // BLIND PEER DOES NOT HAVE ENCRYPTION KEY
     const peer2 = new Drive(__dirname + '/peer2', peer1.publicKey, {
       keyPair: DHT.keyPair(),
       blind: true,
+      syncFiles: false,
+      includeFiles: ['/test.doc'],
       swarmOpts: {
         server: true,
         client: true
@@ -194,6 +199,11 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
       if(data.value.foo) {
         t.ok(data.value.foo, 'peer 1 has value foo')
       }
+    })
+
+    // Test that peer2 syncs includeFiles
+    peer2.on('file-sync', async file => {
+      t.equals(file.path, '/test.doc', 'peer 2 synced includeFiles')
     })
 
     peer2.on('collection-update', async data => {

@@ -47,7 +47,8 @@ class Drive extends EventEmitter {
       fullTextSearch, // Initialize a corestore to support full text search indexes.
       blind, // Set to true if blind mirroring another drive (you don't have the encryption key)
       storageMaxBytes, // Max size this drive will store in bytes before turning off replication/file syncing
-      syncFiles = true
+      syncFiles = true,
+      includeFiles
     }
   ) {
     super()
@@ -78,6 +79,7 @@ class Drive extends EventEmitter {
     this.blind = blind ? blind : false
     this.storageMaxBytes = storageMaxBytes || false
     this.syncFiles = syncFiles
+    this.includeFiles = includeFiles
     this.opened = false
 
     // When using custom storage, transform drive path into beginning of the storage namespace
@@ -186,7 +188,7 @@ class Drive extends EventEmitter {
       await this.connect()
     }
 
-    if(this.syncFiles) {
+    if(this.syncFiles || this.includeFiles) {
       const stream = this.metadb.createReadStream({ live: true })
       
       stream.on('data', async data => {
@@ -797,8 +799,8 @@ class Drive extends EventEmitter {
       data.value.peer_key !== this.keyPair.publicKey.toString('hex') &&
       !fileHash
     ) {
-      if (data.value.hash) {
-        
+
+      if (!this.includeFiles && data.value.hash || this.includeFiles && this.includeFiles.indexOf(data.value.path) > -1 && data.value.hash) {
         this.emit('sync')
 
         try {
