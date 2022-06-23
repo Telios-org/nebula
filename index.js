@@ -770,12 +770,11 @@ class Drive extends EventEmitter {
       })
     }
 
-    if(!this.blind) {
-      // If this drive can't decipher the data inside the remote hypercore's then just listen for when those cores are updated.
-      this.database.on('collection-update', () => {
-        this.emit('collection-update')
-      })
-    }
+
+    // If this drive can't decipher the data inside the remote hypercore's then just listen for when those cores are updated.
+    this.database.on('collection-update', () => {
+      this.emit('collection-update')
+    })
 
     this.database.on('remote-cores-downloaded', () => {
       this.emit('remote-cores-downloaded')

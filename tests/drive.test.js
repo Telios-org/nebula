@@ -206,7 +206,7 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
       t.equals(file.path, '/test.doc', 'peer 2 synced includeFiles')
     })
 
-    peer2.on('collection-update', async data => {
+    peer2.once('collection-update', async data => {
       await peer1.close()
       await peer3.ready()
     })
