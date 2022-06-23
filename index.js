@@ -169,7 +169,10 @@ class Drive extends EventEmitter {
     }
 
     this.publicKey = this.database.localMetaCore.key.toString('hex')
-    this.peerWriterKey = this.database.localInput.key.toString('hex')
+
+    if(!this.blind) {
+      this.peerWriterKey = this.database.localInput.key.toString('hex')
+    }
 
     if (this.peerPubKey) {
       this.discoveryKey = createTopicHash(this.peerPubKey).toString('hex')
@@ -179,10 +182,12 @@ class Drive extends EventEmitter {
 
     // Data here can only be read by peer drives
     // that are sharing the same drive secret
-    this._collections.files = await this.database.collection('file')
+    if(!this.blind) {
+      this._collections.files = await this.database.collection('file')
 
-    // This drastically speeds up queries and is necessary for sorting by fields
-    await this._collections.files.createIndex(['path'])
+      // This drastically speeds up queries and is necessary for sorting by fields
+      await this._collections.files.createIndex(['path'])
+    }
 
     if (this.keyPair && this.joinSwarm) {
       await this.connect()
@@ -247,26 +252,7 @@ class Drive extends EventEmitter {
           }
         }
       })
-    } else {
-      // If this drive can't decipher the data inside the remote hypercore's then just listen for when those cores are updated.
-      this.database.on('collection-update', () => {
-        this.emit('collection-update')
-      })
     }
-
-    this.database.on('peer-connected', (peer) => {
-      if(!this.peers.has(peer.peerPubKey)) {
-        this.emit('peer-connected', peer)
-        this.peers.add(peer.peerPubKey)
-      }
-    })
-
-    this.database.on('peer-disconnected', (peer) => {
-      if(this.peers.has(peer.peerPubKey)) {
-        this.emit('peer-disconnected', peer)
-        this.peers.delete(peer.peerPubKey)
-      }
-    })
 
     this.opened = true
   }
@@ -783,6 +769,31 @@ class Drive extends EventEmitter {
         }
       })
     }
+
+    if(!this.blind) {
+      // If this drive can't decipher the data inside the remote hypercore's then just listen for when those cores are updated.
+      this.database.on('collection-update', () => {
+        this.emit('collection-update')
+      })
+    }
+
+    this.database.on('remote-cores-downloaded', () => {
+      this.emit('remote-cores-downloaded')
+    })
+
+    this.database.on('peer-connected', (peer) => {
+      if(!this.peers.has(peer.peerPubKey)) {
+        this.emit('peer-connected', peer)
+        this.peers.add(peer.peerPubKey)
+      }
+    })
+
+    this.database.on('peer-disconnected', (peer) => {
+      if(this.peers.has(peer.peerPubKey)) {
+        this.emit('peer-disconnected', peer)
+        this.peers.delete(peer.peerPubKey)
+      }
+    })
 
     await this.database.ready()
 
