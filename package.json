@@ -1,13 +1,14 @@
 {
   "name": "@telios/nebula",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "description": "Real-time distributed file and data storage.",
   "main": "index.js",
   "scripts": {
     "test": "cross-env NODE_ENV=test_sdk tape tests/*.test.js | tap-spec",
     "semantic-release": "semantic-release",
     "commit": "cz",
-    "debug": "cross-env NODE_ENV=test_sdk tape tests/drive.test.js | tap-spec --nolazy --debug-brk=5858"
+    "debug": "cross-env NODE_ENV=test_sdk tape tests/drive.test.js | tap-spec --nolazy --debug-brk=5858",
+    "preinstall": "npm-force-resolutions"
   },
   "repository": {
     "type": "git",
@@ -51,10 +52,14 @@
     "cz-conventional-changelog": "^3.0.1",
     "del": "^6.0.0",
     "husky": "^6.0.0",
+    "npm-force-resolutions": "^0.0.10",
     "semantic-release": "^17.4.2",
     "tap-spec": "^2.2.2",
     "tape": "^5.2.2",
     "tape-promise": "^4.0.0"
+  },
+  "resolutions": {
+    "@hyperswarm/dht": "5.0.17"
   },
   "directories": {
     "lib": "lib",
