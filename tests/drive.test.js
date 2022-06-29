@@ -180,7 +180,6 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
       keyPair: DHT.keyPair(),
       blind: true,
       syncFiles: false,
-      fileRetryAttempts: 10,
       includeFiles: ['/test.doc'],
       swarmOpts: {
         server: true,
