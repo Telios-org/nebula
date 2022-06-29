@@ -65,7 +65,7 @@ test('Drive - Create', async t => {
 })
 
 test('Drive - Upload Local Encrypted File', async t => {
-  t.plan(27)
+  t.plan(28)
 
   try {
 
@@ -84,7 +84,7 @@ test('Drive - Upload Local Encrypted File', async t => {
     await drive.ready()
 
     const readStream = fs.createReadStream(path.join(__dirname, '/data/email.eml'))
-    const file = await drive.writeFile('/email/rawEmailEncrypted.eml', readStream, { encrypted: true })
+    const file = await drive.writeFile('/email/rawEmailEncrypted.eml', readStream, { encrypted: true, customData: { foo: 'bar' } })
 
     hyperFiles.push(file)
 
@@ -92,10 +92,11 @@ test('Drive - Upload Local Encrypted File', async t => {
     t.ok(file.header, `File was encrypted with header`)
     t.ok(file.hash, `Hash of file was returned ${file.hash}`)
     t.ok(file.size, `Size of file in bytes was returned ${file.size}`)
+    t.equals(file.custom_data.foo, 'bar', `File has custom data`)
 
     for (let i = 0; i < 20; i++) {
       const readStream = fs.createReadStream(path.join(__dirname, '/data/email.eml'))
-      const file = await drive.writeFile(`/email/rawEmailEncrypted${i}.eml`, readStream, { encrypted: true })
+      const file = await drive.writeFile(`/email/rawEmailEncrypted${i}.eml`, readStream, { encrypted: true, customData: { foo: 'bar' } })
       t.ok(file)
     }
 
@@ -159,6 +160,9 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
 
     const peer1 = new Drive(__dirname + '/peer1', null, {
       keyPair: DHT.keyPair(),
+      storage: ram,
+      checkNetworkStatus: true,
+      fullTextSearch: true,
       encryptionKey: encKey,
       swarmOpts: {
         server: true,
@@ -176,6 +180,7 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
       keyPair: DHT.keyPair(),
       blind: true,
       syncFiles: false,
+      fileRetryAttempts: 10,
       includeFiles: ['/test.doc'],
       swarmOpts: {
         server: true,
@@ -203,12 +208,9 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
 
     // Test that peer2 syncs includeFiles
     peer2.on('file-sync', async file => {
-      t.equals(file.path, '/test.doc', 'peer 2 synced includeFiles')
-    })
-
-    peer2.once('collection-update', async data => {
       await peer1.close()
       await peer3.ready()
+      t.equals(file.path, '/test.doc', 'peer 2 synced includeFiles')
     })
 
     peer3.on('collection-update', async data => {

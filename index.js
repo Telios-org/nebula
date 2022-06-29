@@ -324,13 +324,14 @@ class Drive extends EventEmitter {
       socket.once('data', async data => {
         const fileHash = data.toString('utf-8')
         const file = await this.metadb.get(fileHash)
-      
+
         if (!file || file.value.deleted) {
           let err = new Error()
           err.message = 'Requested file was not found on drive'
           socket.destroy(err)
         } else {
           const readStream = fs.createReadStream(path.join(this.drivePath, `./Files${file.value.path}`))
+
           pump(readStream, socket, (err) => {
             // handle done
           })
@@ -413,7 +414,8 @@ class Drive extends EventEmitter {
           hash: file.hash,
           path: `/${uuid}`,
           peer_key: this.keyPair.publicKey.toString('hex'),
-          discovery_key: this.discoveryKey
+          discovery_key: this.discoveryKey,
+          custom_data: opts.customData
         })
 
         const fileMeta = {
@@ -427,7 +429,8 @@ class Drive extends EventEmitter {
           hash: file.hash,
           path: filePath,
           peer_key: this.keyPair.publicKey.toString('hex'),
-          discovery_key: this.discoveryKey
+          discovery_key: this.discoveryKey,
+          custom_data: opts.customData
         }
 
         await this._collections.files.insert({ ...fileMeta, updatedAt: new Date().toISOString() })
@@ -466,7 +469,8 @@ class Drive extends EventEmitter {
                 hash: _hash,
                 path,
                 peer_key: this.keyPair.publicKey.toString('hex'),
-                discovery_key: this.discoveryKey
+                discovery_key: this.discoveryKey,
+                custom_data: opts.customData
               })
 
               const fileMeta = {
@@ -477,7 +481,8 @@ class Drive extends EventEmitter {
                 hash: _hash,
                 path: filePath,
                 peer_key: this.keyPair.publicKey.toString('hex'),
-                discovery_key: this.discoveryKey
+                discovery_key: this.discoveryKey,
+                custom_data: opts.customData
               }
 
               await this._collections.files.insert({ ...fileMeta, updatedAt: new Date().toISOString() })
