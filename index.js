@@ -235,19 +235,23 @@ class Drive extends EventEmitter {
             // TODO: This feels very hacky. Ideally we should be grabbing this record by its key and not looping through the collection again.
             const cStream2 = this.database.autobee.createReadStream({ reverse: true })
             cStream2.on('data', async d => {
-              const _op = HyperbeeMessages.Node.decode(d.value)
+              try {
+                const _op = HyperbeeMessages.Node.decode(d.value)
 
-              if(_op.key.toString('hex') === op.key.toString('hex') && _op.value) {
-                const val = BSON.deserialize(_op.value)
-                const node = {
-                  collection,
-                  type: 'del',
-                  value: {
-                    ...val,
-                    _id: val._id.toString('hex')
+                if(_op && _op.key.toString('hex') === op.key.toString('hex') && _op.value) {
+                  const val = BSON.deserialize(_op.value)
+                  const node = {
+                    collection,
+                    type: 'del',
+                    value: {
+                      ...val,
+                      _id: val._id.toString('hex')
+                    }
                   }
+                  this.emit('collection-update', node )
                 }
-                this.emit('collection-update', node )
+              } catch(err) {
+                console.log(err)
               }
             })
           }
@@ -277,7 +281,7 @@ class Drive extends EventEmitter {
             }
 
             if(this.storageMaxBytes) await this.database._updateStatBytes()
-            
+
             this.emit('collection-update', node)
           }
         }
@@ -864,7 +868,8 @@ class Drive extends EventEmitter {
       }
     }
 
-    if (data.value.deleted) {
+    if (data.value.deleted &&
+      data.value.peer_key !== this.keyPair.publicKey.toString('hex')) {
       try {
         let filePath = path.join(this._filesDir, `${data.value.path}`)
         
