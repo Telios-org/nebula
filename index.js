@@ -863,8 +863,10 @@ class Drive extends EventEmitter {
           throw err
         }
       } else {
-        const filePath = data.value.encrypted ? `/${data.value.uuid}` : data.value.path
-        await this._localHB.put(filePath, {})
+        if(data.value.path) {
+          const filePath = data.value.encrypted ? `/${data.value.uuid}` : data.value.path
+          await this._localHB.put(filePath, {})
+        }
       }
     }
 
