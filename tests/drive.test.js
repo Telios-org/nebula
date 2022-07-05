@@ -518,13 +518,13 @@ test('Drive - Fail to Fetch Files from Remote Drive', async t => {
 })
 
 test('Drive - Unlink Local File', async t => {
-  t.plan(4)
+  t.plan(3)
 
   const drive1Size = drive.info().size
   const drive2Size = drive2.info().size
 
-  drive2.on('collection-update', async data => {
-    t.ok(data.value._id)
+  drive2.on('collection-update', async doc => {
+    t.equals(doc.type, 'del', `Collection updated with type 'del'`)
   })
 
   drive.on('file-unlink', file => {

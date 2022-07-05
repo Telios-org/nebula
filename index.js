@@ -125,7 +125,8 @@ class Drive extends EventEmitter {
             setTimeout(async () => {
               if(this.opened) {
                 this.emit('file-sync', file)
-                await this._localHB.put(file.uuid, {})
+                const filePath = file.encrypted ? `/${file.uuid}` : file.path
+                await this._localHB.put(filePath, {})
               }
             })
 
@@ -193,24 +194,23 @@ class Drive extends EventEmitter {
       await this.connect()
     }
 
-    if(this.syncFiles || this.includeFiles) {
-      const stream = this.metadb.createReadStream({ live: true })
-      
-      stream.on('data', async data => {
-        if(data.value.toString().indexOf('hyperbee') === -1) {
-          const op = HyperbeeMessages.Node.decode(data.value)
-          const node = {
-            key: op.key.toString('utf8'),
-            value: JSON.parse(op.value.toString('utf8')),
-            seq: data.seq
-          }
-  
-          if (node.key !== '__peers') {
-            await this._update(node)
-          }
+    
+    const stream = this.metadb.createReadStream({ live: true })
+    
+    stream.on('data', async data => {
+      if(data.value.toString().indexOf('hyperbee') === -1) {
+        const op = HyperbeeMessages.Node.decode(data.value)
+        const node = {
+          key: op.key.toString('utf8'),
+          value: JSON.parse(op.value.toString('utf8')),
+          seq: data.seq
         }
-      })
-    }
+
+        if (node.key !== '__peers') {
+          await this._update(node)
+        }
+      }
+    })
 
     if(!this.blind) {
       const lastCollectionSeq = this._localDB.get('collection-lastSeq')
@@ -218,7 +218,7 @@ class Drive extends EventEmitter {
       const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
 
       cStream.on('data', async data => {
-        if(data.value.toString().indexOf('hyperbee') === -1) {
+        if(data.value.toString().indexOf('hyperbee') === -1) {          
           if(lastCollectionSeq && lastCollectionSeq.seq && data.seq < lastCollectionSeq.seq) return
           
           this._localDB.put('collection-lastSeq', { seq: data.seq })
@@ -231,6 +231,27 @@ class Drive extends EventEmitter {
 
           collection = key.split('-')[0]
 
+          if(!op.value) {
+            // TODO: This feels very hacky. Ideally we should be grabbing this record by its key and not looping through the collection again.
+            const cStream2 = this.database.autobee.createReadStream({ reverse: true })
+            cStream2.on('data', async d => {
+              const _op = HyperbeeMessages.Node.decode(d.value)
+
+              if(_op.key.toString('hex') === op.key.toString('hex') && _op.value) {
+                const val = BSON.deserialize(_op.value)
+                const node = {
+                  collection,
+                  type: 'del',
+                  value: {
+                    ...val,
+                    _id: val._id.toString('hex')
+                  }
+                }
+                this.emit('collection-update', node )
+              }
+            })
+          }
+
           try {
             value = BSON.deserialize(op.value)
           } catch(err) {
@@ -238,8 +259,17 @@ class Drive extends EventEmitter {
           }
 
           if(value && value._id) {
+            let type
+
+            if(value.deleted) {
+              type = 'del'
+            } else {
+              type = data.clock.size > 1 ? 'update' : 'create'
+            }
+
             const node = {
               collection,
+              type,
               value: {
                 ...value,
                 _id: value._id.toString('hex')
@@ -712,7 +742,7 @@ class Drive extends EventEmitter {
       await this.database._updateStatBytes(-Math.abs(file.value.size))
 
       await this.metadb.put(file.value.hash, {
-        uuid: file.value.uuid,
+        path: file.value.encrypted ? `/${file.value.uuid}` : file.value.path,
         discovery_key: file.value.discovery_key,
         size: file.value.size,
         deleted: true
@@ -777,9 +807,11 @@ class Drive extends EventEmitter {
 
 
     // If this drive can't decipher the data inside the remote hypercore's then just listen for when those cores are updated.
-    this.database.on('collection-update', () => {
-      this.emit('collection-update')
-    })
+    if(this.blind) {
+      this.database.on('collection-update', () => {
+        this.emit('collection-update')
+      })
+    }
 
     this.database.on('remote-cores-downloaded', () => {
       this.emit('remote-cores-downloaded')
@@ -807,7 +839,9 @@ class Drive extends EventEmitter {
 
   async _update(data) {
 
-    const fileHash = await this._localHB.get(data.value.uuid)
+    this.emit('sync', data.value)
+
+    const fileHash = await this._localHB.get(data.value.path)
 
     if (
       !data.value.deleted &&
@@ -815,9 +849,7 @@ class Drive extends EventEmitter {
       !fileHash
     ) {
 
-      if (!this.includeFiles && data.value.hash || this.includeFiles && this.includeFiles.indexOf(data.value.path) > -1 && data.value.hash) {
-        this.emit('sync')
-
+      if (this.syncFiles && !this.includeFiles && data.value.hash || this.includeFiles && this.includeFiles.indexOf(data.value.path) > -1 && data.value.hash) {
         try {
           const stat = this._localDB.get('stat')
           if(stat.total_bytes <= this.storageMaxBytes || !this.storageMaxBytes) {
@@ -826,27 +858,33 @@ class Drive extends EventEmitter {
         } catch (err) {
           throw err
         }
+      } else {
+        const filePath = data.value.encrypted ? `/${data.value.uuid}` : data.value.path
+        await this._localHB.put(filePath, {})
       }
     }
 
-    if (
-      data.value.deleted &&
-      data.value.peer_key !== this.keyPair.publicKey.toString('hex')
-    ) {
+    if (data.value.deleted) {
       try {
-        const filePath = path.join(this._filesDir, `/${data.value.uuid}`)
+        let filePath = path.join(this._filesDir, `${data.value.path}`)
         
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath)
+
+          const _file = await this._localHB.get(data.value.path)
+          
+          if(_file) {
+            await this._localHB.del(data.value.path)
+          }
+
+          await this.database._updateStatBytes(-Math.abs(data.value.size))
+
+          setTimeout(() => {
+            this.emit('file-unlink', data.value)
+          })
         }
-
-        await this._localHB.del(data.value.uuid)
-        await this.database._updateStatBytes(-Math.abs(data.value.size))
-
-        setTimeout(() => {
-          this.emit('file-unlink', data.value)
-        })
       } catch (err) {
+        console.log(err)
         throw err
       }
     }
