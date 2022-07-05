@@ -251,7 +251,7 @@ class Drive extends EventEmitter {
                   this.emit('collection-update', node )
                 }
               } catch(err) {
-                console.log(err)
+                // handle error
               }
             })
           }
@@ -262,7 +262,7 @@ class Drive extends EventEmitter {
             // womp womp
           }
 
-          if(value && value._id) {
+          if(value && value._id && value.author !== this.keyPair.publicKey.toString('hex')) {
             let type
 
             if(value.deleted) {

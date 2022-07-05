@@ -153,7 +153,7 @@ test('Drive - Create Seed Peer', async t => {
 })
 
 test('Drive - Sync Remote Database Updates from blind peer', async t => {
-  t.plan(3)
+  t.plan(2)
 
   try {
     const encKey = Buffer.alloc(32, 'hello world')
@@ -199,12 +199,6 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
       }
     })
 
-    peer1.on('collection-update', async data => {
-      if(data.value.foo) {
-        t.ok(data.value.foo, 'peer 1 has value foo')
-      }
-    })
-
     // Test that peer2 syncs includeFiles
     peer2.on('file-sync', async file => {
       await peer1.close()
@@ -235,7 +229,7 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
 })
 
 test('Drive - Sync Remote Database Updates', async t => {
-  t.plan(6)
+  t.plan(4)
 
   try {
     const encKey = Buffer.alloc(32, 'hello world')
@@ -274,10 +268,6 @@ test('Drive - Sync Remote Database Updates', async t => {
     await peer3.ready()
 
     peer1.on('collection-update', async data => {
-      if(data.value.foo) {
-        t.ok(data.value.foo, 'peer 1 has value foo')
-      }
-
       if(data.value.hello) {
         t.ok(data.value.hello, 'peer 1 has value hello')
       }
@@ -296,10 +286,6 @@ test('Drive - Sync Remote Database Updates', async t => {
     peer3.on('collection-update', async data => {
       if(data.value.foo) {
         t.ok(data.value.foo, 'peer 3 has value foo')
-      }
-
-      if(data.value.hello) {
-        t.ok(data.value.hello, 'peer 3 has value hello')
       }
     })
 
