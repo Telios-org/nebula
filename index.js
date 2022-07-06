@@ -248,7 +248,10 @@ class Drive extends EventEmitter {
                       _id: val._id.toString('hex')
                     }
                   }
-                  this.emit('collection-update', node )
+                  
+                  if(val.author !== this.keyPair.publicKey.toString('hex')) {
+                    this.emit('collection-update', node )
+                  }
                 }
               } catch(err) {
                 // handle error
@@ -731,24 +734,20 @@ class Drive extends EventEmitter {
     }
 
     try {
-      const _file = await this._collections.files.findOne({ path: fp })
+      const file = await this._collections.files.findOne({ path: fp })
 
-      if (!_file) return
+      if (!file) return
 
-      const file = await this.metadb.get(_file.hash)
+      fs.unlinkSync(path.join(this._filesDir, file.encrypted ? `/${file.uuid}` : file.path))
 
-      if(!file) return
+      await this._collections.files.update({ _id: file._id} , { uuid: file.uuid, deleted: true, updatedAt: new Date().toISOString() })
 
-      fs.unlinkSync(path.join(this._filesDir, file.value.path))
+      await this.database._updateStatBytes(-Math.abs(file.size))
 
-      await this._collections.files.update({ _id: _file._id} , { uuid: file.value.uuid, deleted: true, updatedAt: new Date().toISOString() })
-
-      await this.database._updateStatBytes(-Math.abs(file.value.size))
-
-      await this.metadb.put(file.value.hash, {
-        path: file.value.encrypted ? `/${file.value.uuid}` : file.value.path,
-        discovery_key: file.value.discovery_key,
-        size: file.value.size,
+      await this.metadb.put(file.hash, {
+        path: file.encrypted ? `/${file.uuid}` : file.path,
+        discovery_key: file.discovery_key,
+        size: file.size,
         deleted: true
       })
 
