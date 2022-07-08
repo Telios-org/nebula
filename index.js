@@ -48,7 +48,8 @@ class Drive extends EventEmitter {
       blind, // Set to true if blind mirroring another drive (you don't have the encryption key)
       storageMaxBytes, // Max size this drive will store in bytes before turning off replication/file syncing
       syncFiles = true,
-      includeFiles
+      includeFiles,
+      broadcast = true // Tell the other peer drives about this drive
     }
   ) {
     super()
@@ -81,6 +82,7 @@ class Drive extends EventEmitter {
     this.syncFiles = syncFiles
     this.includeFiles = includeFiles
     this.opened = false
+    this.broadcast = broadcast
 
     // When using custom storage, transform drive path into beginning of the storage namespace
     this.storageName = drivePath.slice(drivePath.lastIndexOf('/') + 1, drivePath.length)
@@ -785,7 +787,8 @@ class Drive extends EventEmitter {
       blind: this.blind,
       stat: this._stat,
       storageMaxBytes: this.storageMaxBytes,
-      fileStatPath: this._fileStatPath
+      fileStatPath: this._fileStatPath,
+      broadcast: this.broadcast
     })
 
     this.database.on('disconnected', () => {

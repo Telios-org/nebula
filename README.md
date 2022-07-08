@@ -153,6 +153,7 @@ Options include:
   checkNetworkStatus: true | false // Listen for when the drive's network status changes
   fulltextSearch: true | false // support full text search indexes
   blind: true // Initialize drive as a blind seeder. For example when you're seeding another encrypted drive and you don't have the encryption key
+  broadcast: true // Tell other peers about this drive. Defaults to true.
 }
 ```
 
