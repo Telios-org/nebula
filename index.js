@@ -215,15 +215,12 @@ class Drive extends EventEmitter {
     })
 
     if(!this.blind) {
-      const lastCollectionSeq = this._localDB.get('collection-lastSeq')
-
       const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
 
       cStream.on('data', async data => {
-        if(data.value.toString().indexOf('hyperbee') === -1) {          
-          if(lastCollectionSeq && lastCollectionSeq.seq && data.seq < lastCollectionSeq.seq) return
+        
+        if(data.value.toString().indexOf('hyperbee') === -1) {
           
-          this._localDB.put('collection-lastSeq', { seq: data.seq })
           const op = HyperbeeMessages.Node.decode(data.value)
           const key = op.key.toString('utf8')
           let collection
@@ -235,7 +232,7 @@ class Drive extends EventEmitter {
 
           if(!op.value) {
             // TODO: This feels very hacky. Ideally we should be grabbing this record by its key and not looping through the collection again.
-            const cStream2 = this.database.autobee.createReadStream({ reverse: true })
+            const cStream2 = this.database.autobee.createReadStream({ reverse: true, live: true })
             cStream2.on('data', async d => {
               try {
                 const _op = HyperbeeMessages.Node.decode(d.value)
@@ -251,9 +248,7 @@ class Drive extends EventEmitter {
                     }
                   }
                   
-                  if(val.author !== this.keyPair.publicKey.toString('hex')) {
-                    this.emit('collection-update', node )
-                  }
+                  this.emit('collection-update', node )
                 }
               } catch(err) {
                 // handle error
