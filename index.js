@@ -898,7 +898,7 @@ class Drive extends EventEmitter {
 
         const val = BSON.deserialize(op.value)
 
-        if(val && val.version !== "1.0" && !val.name && !val.fields && !val.opts) {
+        if(val && val.version !== "1.0") {
           return val
         }
       } catch(err) {
