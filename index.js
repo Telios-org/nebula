@@ -215,12 +215,10 @@ class Drive extends EventEmitter {
     })
 
     if(!this.blind) {
-      const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
+      const cStream = this.database.autobee.createReadStream({ live: true, tail: true }) // Collections stream
 
       cStream.on('data', async data => {
-        
         if(data.value.toString().indexOf('hyperbee') === -1) {
-          
           const op = HyperbeeMessages.Node.decode(data.value)
           const key = op.key.toString('utf8')
           let collection
@@ -231,29 +229,22 @@ class Drive extends EventEmitter {
           collection = key.split('-')[0]
 
           if(!op.value) {
-            // TODO: This feels very hacky. Ideally we should be grabbing this record by its key and not looping through the collection again.
-            const cStream2 = this.database.autobee.createReadStream({ reverse: true, live: true })
-            cStream2.on('data', async d => {
-              try {
-                const _op = HyperbeeMessages.Node.decode(d.value)
+            const val = await this._getPrevVal(data.clock)
 
-                if(_op && _op.key.toString('hex') === op.key.toString('hex') && _op.value) {
-                  const val = BSON.deserialize(_op.value)
-                  const node = {
-                    collection,
-                    type: 'del',
-                    value: {
-                      ...val,
-                      _id: val._id.toString('hex')
-                    }
+            if(val) {
+              if(val._id) {
+                const node = {
+                  collection,
+                  type: 'del',
+                  value: {
+                    ...val,
+                    _id: val._id.toString('hex')
                   }
-                  
-                  this.emit('collection-update', node )
                 }
-              } catch(err) {
-                // handle error
+
+                this.emit('collection-update', node )
               }
-            })
+            } 
           }
 
           try {
@@ -893,6 +884,25 @@ class Drive extends EventEmitter {
       } catch (err) {
         console.log(err)
         throw err
+      }
+    }
+  }
+
+  async _getPrevVal(map) {
+    for (let [key, value] of map) {
+      try {
+        const data = await this.database.autobee.autobase.view.get(value)
+        const op = HyperbeeMessages.Node.decode(data)
+        
+        if(!op || !op.value || !op.key.toString('hex')) continue
+
+        const val = BSON.deserialize(op.value)
+
+        if(val && val.version !== "1.0" && !val.name && !val.fields && !val.opts) {
+          return val
+        }
+      } catch(err) {
+        // womp womp
       }
     }
   }

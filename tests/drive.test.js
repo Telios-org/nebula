@@ -152,6 +152,83 @@ test('Drive - Create Seed Peer', async t => {
   hyperFiles.push(file)
 })
 
+test('Drive - Add/remove docs from synced drives', async t => {
+  t.plan(3)
+
+  try {
+    const encKey = Buffer.alloc(32, 'hello world')
+
+    const peer1 = new Drive(__dirname + '/peer1', null, {
+      keyPair: DHT.keyPair(),
+      checkNetworkStatus: true,
+      fullTextSearch: true,
+      encryptionKey: encKey,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await peer1.ready()
+
+    const peer2 = new Drive(__dirname + '/peer2', peer1.publicKey, {
+      keyPair: DHT.keyPair(),
+      checkNetworkStatus: true,
+      fullTextSearch: true,
+      encryptionKey: encKey,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await peer2.ready()
+
+    const collection1 = await peer1.db.collection('example')
+    await collection1.createIndex(['foo2'])
+
+    const collection2 = await peer2.db.collection('example')
+    await collection2.createIndex(['foo2'])
+
+    peer2.once('collection-update', async data => {
+      if(data.type !== 'del') {
+        await collection2.remove({ foo2: 'bar2' })
+        t.ok(true, 'Peer2 deleted synced document from peer1')
+      }
+    })
+
+    peer2.on('collection-update', async data => {
+      if(data.type === 'del') {
+        const docs = await collection2.find({ foo2: 'bar2' })
+        t.equals(0, docs.length, 'Peer2 returns 0 results')
+      }
+    })
+
+    peer1.on('collection-update', async data => {
+      if(data.type === 'del') {
+        const docs = await collection1.find({ foo2: 'bar2' })
+        t.equals(0, docs.length, 'Peer1 returns 0 results')
+      }
+    })
+
+    await collection1.insert({ foo0: 'bar0' })
+    await collection1.insert({ foo1: 'bar1' })
+    const doc = await collection1.insert({ foo2: 'bar2' })
+    await collection1.ftsIndex(['foo2'], [doc])
+
+    t.teardown(async () => {
+      try {
+        await closeCores([peer1, peer2])
+        await peerCleanup()
+      } catch(err) {
+        console.log(err)
+      }
+    })
+  } catch(err) {
+    console.log(err)
+  }
+})
+
 test('Drive - Sync Remote Database Updates from blind peer', async t => {
   t.plan(2)
 
