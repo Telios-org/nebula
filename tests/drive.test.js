@@ -34,7 +34,6 @@ test('Drive - Create', async t => {
   await peerCleanup()
 
   drive = new Drive(__dirname + '/drive', null, {
-    storage: ram,
     keyPair,
     encryptionKey,
     checkNetworkStatus: true,
@@ -70,7 +69,6 @@ test('Drive - Upload Local Encrypted File', async t => {
   try {
 
     drive = new Drive(__dirname + '/drive', null, {
-      storage: ram,
       keyPair,
       encryptionKey,
       checkNetworkStatus: true,
@@ -230,14 +228,13 @@ test('Drive - Add/remove docs from synced drives', async t => {
 })
 
 test('Drive - Sync Remote Database Updates from blind peer', async t => {
-  t.plan(2)
+  t.plan(3)
 
   try {
     const encKey = Buffer.alloc(32, 'hello world')
 
     const peer1 = new Drive(__dirname + '/peer1', null, {
       keyPair: DHT.keyPair(),
-      storage: ram,
       checkNetworkStatus: true,
       fullTextSearch: true,
       encryptionKey: encKey,
@@ -286,6 +283,24 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
     peer3.on('collection-update', async data => {
       if(data.value.foo) {
         t.ok(data.value.foo, 'peer 3 has value foo')
+
+        try {
+          const collection2 = await peer3.db.collection('example')
+          await collection2.insert({ hello: 'world' })
+          
+          await peer3.close()
+          await peer1.ready()
+
+          peer1.on('collection-update', async data => {
+            if(data.value.hello) {
+              const col = await peer1.db.collection('example')
+              const docs = await col.find(data.value)
+              t.equals(docs[0].hello, 'world', 'peer 1 retrieved update from peer3')
+            }
+          })
+        } catch(err) {
+          console.log(err)
+        }
       }
     })
 
@@ -377,11 +392,11 @@ test('Drive - Sync Remote Database Updates', async t => {
         await closeCores([peer1, peer2, peer3])
         await peerCleanup()
       } catch(err) {
-        console.log(err)
+        t.fail(err)
       }
     })
   } catch(err) {
-    console.log(err)
+    t.fail(err)
   }
 })
 
@@ -442,7 +457,7 @@ test('Drive - Remove remote peer', async t => {
     })
 
     peer4.on('collection-update', async data => {
-      if(data.value.bar) {
+      if(data.value.baz) {
         t.fail('Should not sync data from removed peer!')
       }
 
@@ -463,6 +478,8 @@ test('Drive - Remove remote peer', async t => {
           writer: peer2.peerWriterKey, 
           meta: peer2.publicKey
         })
+
+        await collection2.insert({ baz: 'foo' })
 
         await peer4.ready()
       }

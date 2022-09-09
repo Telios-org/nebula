@@ -332,6 +332,7 @@ class Drive extends EventEmitter {
     this._swarm.on('message', async (peerPubKey, data) => {
       try {
         const msg = JSON.parse(data.toString())
+        
         if(msg && msg.type === 'sync') {
           const drivePubKey = this.peerPubKey || this.publicKey
 
@@ -371,7 +372,7 @@ class Drive extends EventEmitter {
       })
     })
 
-    this._swarm.ready()
+    await this._swarm.ready()
   }
 
   async addPeer(peer) {
