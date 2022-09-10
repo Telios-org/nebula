@@ -300,16 +300,18 @@ class Drive extends EventEmitter {
     })
 
     this._swarm.on('peer-connected', socket => {
-      socket.write(JSON.stringify({
-        type: 'sync',
-        meta: {
-          drivePubKey: this.peerPubKey || this.publicKey,
-          peerPubKey: this.keyPair.publicKey.toString('hex'),
-          blind: this.blind,
-          writer: this.peerWriterKey,
-          meta: this.publicKey
-        }
-      }))
+      if(this.broadcast) {
+        socket.write(JSON.stringify({
+          type: 'sync',
+          meta: {
+            drivePubKey: this.peerPubKey || this.publicKey,
+            peerPubKey: this.keyPair.publicKey.toString('hex'),
+            blind: this.blind,
+            writer: this.peerWriterKey,
+            meta: this.publicKey
+          }
+        }))
+      }
     })
 
     if(this.checkNetworkStatus) {
