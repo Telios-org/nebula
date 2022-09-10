@@ -1,6 +1,6 @@
 {
   "name": "@telios/nebula",
-  "version": "3.4.7",
+  "version": "3.4.8",
   "description": "Real-time distributed file and data storage.",
   "main": "index.js",
   "scripts": {
@@ -12,14 +12,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Telios-org/nebula-drive.git"
+    "url": "https://github.com/Telios-org/nebula.git"
   },
   "author": "Hexadecibal",
   "license": "AGPL-3.0",
   "bugs": {
-    "url": "https://github.com/Telios-org/nebula-drive/issues"
+    "url": "https://github.com/Telios-org/nebula/issues"
   },
-  "homepage": "https://github.com/Telios-org/nebula-drive",
+  "homepage": "https://github.com/Telios-org/nebula",
   "dependencies": {
     "autobase": "1.0.0-alpha.6",
     "blakejs": "^1.1.0",

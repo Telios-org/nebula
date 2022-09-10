@@ -479,9 +479,10 @@ test('Drive - Remove remote peer', async t => {
           meta: peer2.publicKey
         })
 
-        await collection2.insert({ baz: 'foo' })
-
-        await peer4.ready()
+        setTimeout(async () => {
+          await collection2.insert({ baz: 'foo' })
+          await peer4.ready()
+        }, 2000)
       }
     })
 
