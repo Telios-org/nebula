@@ -540,6 +540,10 @@ class Drive extends EventEmitter {
     try {
       file = await this._collections.files.findOne({ path: filePath })
 
+      if(!fs.existsSync(`${this._filesDir}/${file.uuid}`)) {
+        throw new Error('File does not exist.')
+      }
+
       const stream = fs.createReadStream(`${this._filesDir}/${file.uuid}`)
 
       // If key then decipher file

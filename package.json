@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/Telios-org/nebula",
   "dependencies": {
-    "autobase": "1.0.0-alpha.6",
+    "autobase": "^1.0.0-alpha.8",
     "blakejs": "^1.1.0",
     "codecs": "^2.2.0",
     "concat-stream": "^2.0.0",
