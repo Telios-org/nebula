@@ -187,9 +187,6 @@ class Drive extends EventEmitter {
     // that are sharing the same drive secret
     if(!this.blind) {
       this._collections.files = await this.database.collection('file')
-
-      // This drastically speeds up queries and is necessary for sorting by fields
-      await this._collections.files.createIndex(['path'])
     }
 
     if (this.keyPair && this.joinSwarm) {
@@ -277,6 +274,11 @@ class Drive extends EventEmitter {
           }
         }
       })
+    }
+
+    if(!this.blind) {
+      // This drastically speeds up queries and is necessary for sorting by fields
+      await this._collections.files.createIndex(['path'])
     }
 
     this.opened = true
