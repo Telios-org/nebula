@@ -183,6 +183,10 @@ class Drive extends EventEmitter {
       this.discoveryKey = createTopicHash(this.publicKey).toString('hex')
     }
 
+    if (this.keyPair && this.joinSwarm) {
+      await this.connect()
+    }
+
     // Data here can only be read by peer drives
     // that are sharing the same drive secret
     if(!this.blind) {
@@ -191,11 +195,6 @@ class Drive extends EventEmitter {
       // This drastically speeds up queries and is necessary for sorting by fields
       await this._collections.files.createIndex(['path'])
     }
-
-    if (this.keyPair && this.joinSwarm) {
-      await this.connect()
-    }
-
     
     const stream = this.metadb.createReadStream({ live: true })
     
