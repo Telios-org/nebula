@@ -25,7 +25,7 @@ let hyperFiles = []
 const encryptionKey = Buffer.alloc(32, 'hello world')
 
 test('Drive - Create', async t => {
-  t.plan(9)
+  t.plan(7)
 
   let networkCount = 0
 
@@ -49,9 +49,9 @@ test('Drive - Create', async t => {
 
     t.ok(data)
 
-    if(networkCount == 2) {
-      await drive.close()
-    }
+    // if(networkCount == 2) {
+    //   await drive.close()
+    // }
   })
 
   await drive.ready()
@@ -68,22 +68,26 @@ test('Drive - Upload Local Encrypted File', async t => {
 
   try {
 
-    drive = new Drive(__dirname + '/drive', null, {
-      keyPair,
-      encryptionKey,
-      checkNetworkStatus: true,
-      fullTextSearch: true,
-      swarmOpts: {
-        server: true,
-        client: true
-      }
-    })
+    // drive = new Drive(__dirname + '/drive', null, {
+    //   keyPair,
+    //   encryptionKey,
+    //   checkNetworkStatus: true,
+    //   fullTextSearch: true,
+    //   swarmOpts: {
+    //     server: true,
+    //     client: true
+    //   }
+    // })
 
-    await drive.ready()
+    // console.log('pre drive ready')
+
+    // await drive.ready()
+
+    // console.log('post drive ready')
 
     const readStream = fs.createReadStream(path.join(__dirname, '/data/email.eml'))
     const file = await drive.writeFile('/email/rawEmailEncrypted.eml', readStream, { encrypted: true, customData: { foo: 'bar' } })
-
+    console.log(file)
     hyperFiles.push(file)
 
     t.ok(file.key, `File was encrypted with key`)
@@ -139,7 +143,6 @@ test('Drive - Create Seed Peer', async t => {
 
   await drive2.ready()
 
-  
   drive2.on('file-sync', async (file) => {
     t.ok(file.uuid, `File has synced from remote peer`)
   })

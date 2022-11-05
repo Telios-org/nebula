@@ -4,7 +4,7 @@ const getDirName = require('path').dirname
 const path = require('path')
 const Database = require('./lib/database')
 const Hyperbee = require('hyperbee')
-const Hypercore = require('./lib/core')
+const Hypercore = require('hypercore')
 const pump = require('pump')
 const Crypto = require('./lib/crypto')
 const Swarm = require('./lib/swarm')
@@ -157,6 +157,7 @@ class Drive extends EventEmitter {
     if(uncaughtCount === 0) {
       process.on('uncaughtException', (err) => {
         //throw err
+        console.log(err)
       })
     }
 
@@ -196,86 +197,93 @@ class Drive extends EventEmitter {
       await this.connect()
     }
 
-    
-    const stream = this.metadb.createReadStream({ live: true })
+    // const hs = this.database.autobee.createHistoryStream({ live: true })
+
+    // hs.on('data', data => {
+    //   console.log(data)
+    // })
+
+    const stream = this.metaAutobee.createReadStream({ live: true })
     
     stream.on('data', async data => {
-      if(data.value.toString().indexOf('hyperbee') === -1) {
-        const op = HyperbeeMessages.Node.decode(data.value)
-        const node = {
-          key: op.key.toString('utf8'),
-          value: JSON.parse(op.value.toString('utf8')),
-          seq: data.seq
-        }
+      console.log('DAAAATAAAA', data)
+      // if(data.value.toString().indexOf('hyperbee') === -1) {
+      //   const op = HyperbeeMessages.Node.decode(data.value)
+      //   const node = {
+      //     key: op.key.toString('utf8'),
+      //     value: JSON.parse(op.value.toString('utf8')),
+      //     seq: data.seq
+      //   }
 
-        if (node.key !== '__peers') {
-          await this._update(node)
-        }
-      }
+      //   if (node.key !== '__peers') {
+      //     await this._update(node)
+      //   }
+      // }
     })
 
     if(!this.blind) {
-      const cStream = this.database.autobee.createReadStream({ live: true, tail: true }) // Collections stream
+      const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
 
       cStream.on('data', async data => {
-        if(data.value.toString().indexOf('hyperbee') === -1) {
-          const op = HyperbeeMessages.Node.decode(data.value)
-          const key = op.key.toString('utf8')
-          let collection
-          let value
+        console.log('ddddddata', data)
+        // if(data.value.toString().indexOf('hyperbee') === -1) {
+        //   const op = HyperbeeMessages.Node.decode(data.value)
+        //   const key = op.key.toString('utf8')
+        //   let collection
+        //   let value
 
-          if(key.split('-').length === 1) return
+        //   if(key.split('-').length === 1) return
 
-          collection = key.split('-')[0]
+        //   collection = key.split('-')[0]
 
-          if(!op.value) {
-            const val = await this._getPrevVal(data.clock)
+        //   if(!op.value) {
+        //     const val = await this._getPrevVal(data.clock)
 
-            if(val) {
-              if(val._id) {
-                const node = {
-                  collection,
-                  type: 'del',
-                  value: {
-                    ...val,
-                    _id: val._id.toString('hex')
-                  }
-                }
+        //     if(val) {
+        //       if(val._id) {
+        //         const node = {
+        //           collection,
+        //           type: 'del',
+        //           value: {
+        //             ...val,
+        //             _id: val._id.toString('hex')
+        //           }
+        //         }
 
-                this.emit('collection-update', node )
-              }
-            } 
-          }
+        //         this.emit('collection-update', node )
+        //       }
+        //     } 
+        //   }
 
-          try {
-            value = BSON.deserialize(op.value)
-          } catch(err) {
-            // womp womp
-          }
+        //   try {
+        //     value = BSON.deserialize(op.value)
+        //   } catch(err) {
+        //     // womp womp
+        //   }
 
-          if(value && value._id && value.author !== this.keyPair.publicKey.toString('hex')) {
-            let type
+        //   if(value && value._id && value.author !== this.keyPair.publicKey.toString('hex')) {
+        //     let type
 
-            if(value.deleted) {
-              type = 'del'
-            } else {
-              type = data.clock.size > 1 ? 'update' : 'create'
-            }
+        //     if(value.deleted) {
+        //       type = 'del'
+        //     } else {
+        //       type = data.clock.size > 1 ? 'update' : 'create'
+        //     }
 
-            const node = {
-              collection,
-              type,
-              value: {
-                ...value,
-                _id: value._id.toString('hex')
-              }
-            }
+        //     const node = {
+        //       collection,
+        //       type,
+        //       value: {
+        //         ...value,
+        //         _id: value._id.toString('hex')
+        //       }
+        //     }
 
-            if(this.storageMaxBytes) await this.database._updateStatBytes()
+        //     if(this.storageMaxBytes) await this.database._updateStatBytes()
 
-            this.emit('collection-update', node)
-          }
-        }
+        //     this.emit('collection-update', node)
+        //   }
+        // }
       })
     }
 
@@ -354,7 +362,9 @@ class Drive extends EventEmitter {
     this._swarm.on('file-requested', socket => {
       socket.once('data', async data => {
         const fileHash = data.toString('utf-8')
-        const file = await this.metadb.get(fileHash)
+        const file = await this.metadb.findOne(fileHash)
+
+        console.log('FILE-REQUESTED', file)
 
         if (!file || file.value.deleted) {
           let err = new Error()
@@ -378,13 +388,15 @@ class Drive extends EventEmitter {
   }
 
   async addPeer(peer) {
-    await this.database.metadb.put(`__peer:${peer.publicKey}`, {
-      blacklisted: false,
-      peerPubKey: peer.publicKey,
-      blind: peer.blind,
-      cores: {
-        writer: peer.writer,
-        meta: peer.meta
+    await this.database.metadb.insert({ 
+      [`__peer:${peer.publicKey}`]: {
+        blacklisted: false,
+        peerPubKey: peer.publicKey,
+        blind: peer.blind,
+        cores: {
+          writer: peer.writer,
+          meta: peer.meta
+        }
       }
     })
 
@@ -439,14 +451,16 @@ class Drive extends EventEmitter {
 
         await this.database._updateStatBytes(file.size)
 
-        await this.metadb.put(file.hash, {
-          uuid,
-          size: file.size,
-          hash: file.hash,
-          path: `/${uuid}`,
-          peer_key: this.keyPair.publicKey.toString('hex'),
-          discovery_key: this.discoveryKey,
-          custom_data: opts.customData
+        await this.metadb.insert({
+          [file.hash]: {
+            uuid,
+            size: file.size,
+            hash: file.hash,
+            path: `/${uuid}`,
+            peer_key: this.keyPair.publicKey.toString('hex'),
+            discovery_key: this.discoveryKey,
+            custom_data: opts.customData
+          }
         })
 
         const fileMeta = {
@@ -494,14 +508,16 @@ class Drive extends EventEmitter {
             if (bytes > 0) {
               await this.database._updateStatBytes(bytes)
 
-              await this.metadb.put(_hash, {
-                uuid,
-                size: bytes,
-                hash: _hash,
-                path,
-                peer_key: this.keyPair.publicKey.toString('hex'),
-                discovery_key: this.discoveryKey,
-                custom_data: opts.customData
+              await this.metadb.insert({
+                [_hash]: {
+                  uuid,
+                  size: bytes,
+                  hash: _hash,
+                  path,
+                  peer_key: this.keyPair.publicKey.toString('hex'),
+                  discovery_key: this.discoveryKey,
+                  custom_data: opts.customData
+                }
               })
 
               const fileMeta = {
@@ -742,11 +758,13 @@ class Drive extends EventEmitter {
 
       await this.database._updateStatBytes(-Math.abs(file.size))
 
-      await this.metadb.put(file.hash, {
-        path: file.encrypted ? `/${file.uuid}` : file.path,
-        discovery_key: file.discovery_key,
-        size: file.size,
-        deleted: true
+      await this.metadb.insert({ 
+        [file.hash]: {
+          path: file.encrypted ? `/${file.uuid}` : file.path,
+          discovery_key: file.discovery_key,
+          size: file.size,
+          deleted: true
+        }
       })
 
       this.emit('file-unlink', file.value)
@@ -762,12 +780,10 @@ class Drive extends EventEmitter {
   }
 
   async _bootstrap() {
-    this._localCore = new Hypercore(path.join(this.drivePath, `./LocalCore`), { storageNamespace: `${this.storageName}:local-core` })
+    this._localCore = new Hypercore(path.join(this.drivePath, `./LocalCore`))
     await this._localCore.ready()
     this._localHB = new Hyperbee(this._localCore, { keyEncoding: 'utf8', valueEncoding: 'json' })
-    
     this._localDB = new FileDB(`${this.drivePath}/LocalDS`)
-
     this.database = new Database(this.storage || this.drivePath, {
       localDB: this._localDB,
       keyPair: this.keyPair,
@@ -807,7 +823,6 @@ class Drive extends EventEmitter {
       })
     }
 
-
     // If this drive can't decipher the data inside the remote hypercore's then just listen for when those cores are updated.
     if(this.blind) {
       this.database.on('collection-update', () => {
@@ -837,10 +852,10 @@ class Drive extends EventEmitter {
 
     this.db = this.database
     this.metadb = this.database.metadb
+    this.metaAutobee = this.database.metaAutobee
   }
 
   async _update(data) {
-
     this.emit('sync', data.value)
 
     const fileHash = await this._localHB.get(data.value.path)
