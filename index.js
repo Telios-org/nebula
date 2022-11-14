@@ -12,21 +12,20 @@ const stream = require('stream')
 const blake = require('blakejs')
 const Hyperswarm = require('hyperswarm')
 const DHT = require('@hyperswarm/dht')
-const HyperbeeMessages = require('hyperbee/lib/messages.js')
 const MemoryStream = require('memorystream')
 const { v4: uuidv4 } = require('uuid')
 const FixedChunker = require('./util/fixedChunker.js')
 const RequestChunker = require('./util/requestChunker.js')
 const WorkerKeyPairs = require('./util/workerKeyPairs.js')
 const isOnline = require('is-online')
-const BSON = require('bson')
 const FileDB = require('./util/filedb.util')
+const BSON = require('bson')
 
 const HASH_OUTPUT_LENGTH = 32 // bytes
 const MAX_PLAINTEXT_BLOCK_SIZE = 65536
 const MAX_ENCRYPTED_BLOCK_SIZE = 65553
-const FILE_TIMEOUT = 5000 // How long to wait for the on data event when downloading a file from a remote drive.
-const FILE_RETRY_ATTEMPTS = 2 // Fail to fetch file after 3 attempts
+const FILE_TIMEOUT = 2000 // How long to wait for the on data event when downloading a file from a remote drive.
+const FILE_RETRY_ATTEMPTS = 3 // Fail to fetch file after n attempts
 const FILE_BATCH_SIZE = 10 // How many parallel requests are made in each file request batch
 
 
@@ -104,6 +103,8 @@ class Drive extends EventEmitter {
       total_bytes: 0
     }
 
+    this.indexCreated = false
+
     if (!fs.existsSync(drivePath)) {
       fs.mkdirSync(drivePath)
     }
@@ -157,7 +158,8 @@ class Drive extends EventEmitter {
     if(uncaughtCount === 0) {
       process.on('uncaughtException', (err) => {
         //throw err
-        console.log(err)
+        if(err.message.indexOf('PEER_NOT_FOUND') === -1 && err.message.indexOf('connection reset') === -1 && err.message.indexOf('PeerDiscovery') === -1)
+          console.log(err)
       })
     }
 
@@ -190,101 +192,36 @@ class Drive extends EventEmitter {
       this._collections.files = await this.database.collection('file')
 
       // This drastically speeds up queries and is necessary for sorting by fields
-      await this._collections.files.createIndex(['path'])
+      this._collections.files.createIndex(['path'])
     }
+
+    this.database.on('buildNode', data => {
+      this.emit('buildNode', data)
+    })
+
+    this.database.on('addPeer', data => {
+      this.emit('addPeer', data)
+    })
+
+    this.database.on('collection-update', async data => {
+      if(
+        data.value.author === this.keyPair.publicKey.toString('hex') || 
+        data.value.peerPubKey === this.keyPair.publicKey.toString('hex') ||
+        data.value.peer === this.keyPair.publicKey.toString('hex')
+      ) return
+
+      if(data && data.collection === 'metadb' && !data.value.cores) {
+        await this._update(data)
+      } else {
+        if(data.collection !== 'metadb') {
+          // If this drive can't decipher the data inside the remote hypercore's then just listen for when those cores are updated.
+          this.emit('collection-update', !this.blind ? data : null)
+        }
+      }
+    })
 
     if (this.keyPair && this.joinSwarm) {
       await this.connect()
-    }
-
-    // const hs = this.database.autobee.createHistoryStream({ live: true })
-
-    // hs.on('data', data => {
-    //   console.log(data)
-    // })
-
-    const stream = this.metaAutobee.createReadStream({ live: true })
-    
-    stream.on('data', async data => {
-      console.log('DAAAATAAAA', data)
-      // if(data.value.toString().indexOf('hyperbee') === -1) {
-      //   const op = HyperbeeMessages.Node.decode(data.value)
-      //   const node = {
-      //     key: op.key.toString('utf8'),
-      //     value: JSON.parse(op.value.toString('utf8')),
-      //     seq: data.seq
-      //   }
-
-      //   if (node.key !== '__peers') {
-      //     await this._update(node)
-      //   }
-      // }
-    })
-
-    if(!this.blind) {
-      const cStream = this.database.autobee.createReadStream({ live: true }) // Collections stream
-
-      cStream.on('data', async data => {
-        console.log('ddddddata', data)
-        // if(data.value.toString().indexOf('hyperbee') === -1) {
-        //   const op = HyperbeeMessages.Node.decode(data.value)
-        //   const key = op.key.toString('utf8')
-        //   let collection
-        //   let value
-
-        //   if(key.split('-').length === 1) return
-
-        //   collection = key.split('-')[0]
-
-        //   if(!op.value) {
-        //     const val = await this._getPrevVal(data.clock)
-
-        //     if(val) {
-        //       if(val._id) {
-        //         const node = {
-        //           collection,
-        //           type: 'del',
-        //           value: {
-        //             ...val,
-        //             _id: val._id.toString('hex')
-        //           }
-        //         }
-
-        //         this.emit('collection-update', node )
-        //       }
-        //     } 
-        //   }
-
-        //   try {
-        //     value = BSON.deserialize(op.value)
-        //   } catch(err) {
-        //     // womp womp
-        //   }
-
-        //   if(value && value._id && value.author !== this.keyPair.publicKey.toString('hex')) {
-        //     let type
-
-        //     if(value.deleted) {
-        //       type = 'del'
-        //     } else {
-        //       type = data.clock.size > 1 ? 'update' : 'create'
-        //     }
-
-        //     const node = {
-        //       collection,
-        //       type,
-        //       value: {
-        //         ...value,
-        //         _id: value._id.toString('hex')
-        //       }
-        //     }
-
-        //     if(this.storageMaxBytes) await this.database._updateStatBytes()
-
-        //     this.emit('collection-update', node)
-        //   }
-        // }
-      })
     }
 
     this.opened = true
@@ -307,8 +244,30 @@ class Drive extends EventEmitter {
       acl: this.swarmOpts.acl,
     })
 
-    this._swarm.on('peer-connected', socket => {
+    this._swarm.on('peer-connected', async socket => {
       if(this.broadcast) {
+        // const cores = []
+        // const metaStream = this.database.metaAutobee.createReadStream()
+
+        // for await(const data of metaStream) {          
+        //   if(data && data.value && data.value.toString().indexOf('hyperbee') === -1) {
+        //     const node = BSON.deserialize(data.value)
+            
+        //     if(node.cores) {
+        //       socket.write(JSON.stringify({
+        //         type: 'sync',
+        //         meta: {
+        //           drivePubKey: this.peerPubKey || this.publicKey,
+        //           peerPubKey: node.peerPubKey,
+        //           blind: node.blind,
+        //           writer: node.cores.writer,
+        //           meta: node.cores.meta
+        //         }
+        //       }))
+        //     }
+        //   }
+        // }
+
         socket.write(JSON.stringify({
           type: 'sync',
           meta: {
@@ -340,12 +299,12 @@ class Drive extends EventEmitter {
 
 
     this._swarm.on('message', async (peerPubKey, data) => {
+      const drivePubKey = this.peerPubKey || this.publicKey
       try {
         const msg = JSON.parse(data.toString())
-        
         if(msg && msg.type === 'sync') {
-          const drivePubKey = this.peerPubKey || this.publicKey
-
+          this.emit('newMessage', msg)
+          
           if(msg.meta.drivePubKey === drivePubKey) {
             await this.addPeer(msg.meta)
           } else {
@@ -362,16 +321,20 @@ class Drive extends EventEmitter {
     this._swarm.on('file-requested', socket => {
       socket.once('data', async data => {
         const fileHash = data.toString('utf-8')
-        const file = await this.metadb.findOne(fileHash)
+        let file
 
-        console.log('FILE-REQUESTED', file)
+        try {
+          file = await this.metadb.findOne({ hash: fileHash })
+        } catch(err) {
+          // Not Found
+        }
 
-        if (!file || file.value.deleted) {
+        if (!file) {
           let err = new Error()
           err.message = 'Requested file was not found on drive'
           socket.destroy(err)
         } else {
-          const readStream = fs.createReadStream(path.join(this.drivePath, `./Files${file.value.path}`))
+          const readStream = fs.createReadStream(path.join(this.drivePath, `./Files${file.path}`))
 
           pump(readStream, socket, (err) => {
             // handle done
@@ -388,32 +351,29 @@ class Drive extends EventEmitter {
   }
 
   async addPeer(peer) {
-    await this.database.metadb.insert({ 
-      [`__peer:${peer.publicKey}`]: {
+    
+    try {
+      const doc = await this.database.metadb.findOne({ peerPubKey: peer.peerPubKey })
+    } catch(err) {
+      await this.database.metadb.insert({ 
         blacklisted: false,
-        peerPubKey: peer.publicKey,
+        peerPubKey: peer.peerPubKey,
         blind: peer.blind,
         cores: {
           writer: peer.writer,
           meta: peer.meta
         }
-      }
-    })
+      })
 
-    await this.database.addRemotePeer(peer)
+      await this.database.addRemotePeer(peer)
+    }
   }
 
   // Remove Peer
   async removePeer(peer) {
-    await this.database.metadb.put(`__peer:${peer.publicKey}`, {
-      blacklisted: true,
-      peerPubKey: peer.publicKey,
-      blind: peer.blind,
-      cores: {
-        writer: peer.writer,
-        meta: peer.meta
-      }
-    })
+    //if(this.opened) {
+      await this.database.metadb.delete({ peerPubKey: peer.publicKey })
+    //}
   }
 
   async writeFile(path, readStream, opts = {}) {
@@ -452,15 +412,13 @@ class Drive extends EventEmitter {
         await this.database._updateStatBytes(file.size)
 
         await this.metadb.insert({
-          [file.hash]: {
-            uuid,
-            size: file.size,
-            hash: file.hash,
-            path: `/${uuid}`,
-            peer_key: this.keyPair.publicKey.toString('hex'),
-            discovery_key: this.discoveryKey,
-            custom_data: opts.customData
-          }
+          uuid,
+          size: file.size,
+          hash: file.hash,
+          path: `/${uuid}`,
+          peer: this.keyPair.publicKey.toString('hex'),
+          discovery_key: this.discoveryKey,
+          custom_data: opts.customData
         })
 
         const fileMeta = {
@@ -473,7 +431,7 @@ class Drive extends EventEmitter {
           header: header.toString('hex'),
           hash: file.hash,
           path: filePath,
-          peer_key: this.keyPair.publicKey.toString('hex'),
+          peer: this.keyPair.publicKey.toString('hex'),
           discovery_key: this.discoveryKey,
           custom_data: opts.customData
         }
@@ -509,15 +467,13 @@ class Drive extends EventEmitter {
               await this.database._updateStatBytes(bytes)
 
               await this.metadb.insert({
-                [_hash]: {
-                  uuid,
-                  size: bytes,
-                  hash: _hash,
-                  path,
-                  peer_key: this.keyPair.publicKey.toString('hex'),
-                  discovery_key: this.discoveryKey,
-                  custom_data: opts.customData
-                }
+                uuid,
+                size: bytes,
+                hash: _hash,
+                path,
+                peer: this.keyPair.publicKey.toString('hex'),
+                discovery_key: this.discoveryKey,
+                custom_data: opts.customData
               })
 
               const fileMeta = {
@@ -527,7 +483,7 @@ class Drive extends EventEmitter {
                 mimetype: fileExt,
                 hash: _hash,
                 path: filePath,
-                peer_key: this.keyPair.publicKey.toString('hex'),
+                peer: this.keyPair.publicKey.toString('hex'),
                 discovery_key: this.discoveryKey,
                 custom_data: opts.customData
               }
@@ -708,7 +664,6 @@ class Drive extends EventEmitter {
         if (!connected || streamError || !receivedData) {
           attempts += 1
 
-          await swarm.leave(topic)
           await swarm.destroy()
 
           try {
@@ -754,20 +709,13 @@ class Drive extends EventEmitter {
 
       fs.unlinkSync(path.join(this._filesDir, file.encrypted ? `/${file.uuid}` : file.path))
 
-      await this._collections.files.update({ _id: file._id} , { uuid: file.uuid, deleted: true, updatedAt: new Date().toISOString() })
+      await this._collections.files.delete({ _id: file._id })
 
       await this.database._updateStatBytes(-Math.abs(file.size))
 
-      await this.metadb.insert({ 
-        [file.hash]: {
-          path: file.encrypted ? `/${file.uuid}` : file.path,
-          discovery_key: file.discovery_key,
-          size: file.size,
-          deleted: true
-        }
-      })
+      await this.metadb.delete({ hash: file.hash })
 
-      this.emit('file-unlink', file.value)
+      this.emit('file-unlink', file)
     } catch (err) {
       throw err
     }
@@ -784,85 +732,79 @@ class Drive extends EventEmitter {
     await this._localCore.ready()
     this._localHB = new Hyperbee(this._localCore, { keyEncoding: 'utf8', valueEncoding: 'json' })
     this._localDB = new FileDB(`${this.drivePath}/LocalDS`)
-    this.database = new Database(this.storage || this.drivePath, {
-      localDB: this._localDB,
-      keyPair: this.keyPair,
-      storageName: this.storageName,
-      encryptionKey: this.encryptionKey,
-      peerPubKey: this.peerPubKey,
-      acl: this.swarmOpts && this.swarmOpts.acl ? this.swarmOpts.acl : null,
-      joinSwarm: this.joinSwarm,
-      fts: this.fullTextSearch,
-      blind: this.blind,
-      stat: this._stat,
-      storageMaxBytes: this.storageMaxBytes,
-      fileStatPath: this._fileStatPath,
-      broadcast: this.broadcast
-    })
-
-    this.database.on('disconnected', () => {
-      if(this.network.drive) {
-        this.network.drive = false
-        this.emit('network-updated', { drive: this.network.drive })
-      }
-    })
-
-    this.database.on('connected', () => {
-      if(!this.network.drive) {
-        this.network.drive = true
-        this.emit('network-updated', { drive: this.network.drive })
-      }
-    })
-
-    if(this.checkNetworkStatus) {
+    
+    if(!this.database) {
+      this.database = new Database(this.storage || this.drivePath, {
+        localDB: this._localDB,
+        keyPair: this.keyPair,
+        storageName: this.storageName,
+        encryptionKey: this.encryptionKey,
+        peerPubKey: this.peerPubKey,
+        acl: this.swarmOpts && this.swarmOpts.acl ? this.swarmOpts.acl : null,
+        joinSwarm: this.joinSwarm,
+        fts: this.fullTextSearch,
+        blind: this.blind,
+        stat: this._stat,
+        storageMaxBytes: this.storageMaxBytes,
+        fileStatPath: this._fileStatPath,
+        broadcast: this.broadcast
+      })
+      
       this.database.on('disconnected', () => {
         if(this.network.drive) {
           this.network.drive = false
           this.emit('network-updated', { drive: this.network.drive })
         }
       })
-    }
 
-    // If this drive can't decipher the data inside the remote hypercore's then just listen for when those cores are updated.
-    if(this.blind) {
-      this.database.on('collection-update', () => {
-        this.emit('collection-update')
+      this.database.on('connected', () => {
+        if(!this.network.drive) {
+          this.network.drive = true
+          this.emit('network-updated', { drive: this.network.drive })
+        }
+      })
+
+      if(this.checkNetworkStatus) {
+        this.database.on('disconnected', () => {
+          if(this.network.drive) {
+            this.network.drive = false
+            this.emit('network-updated', { drive: this.network.drive })
+          }
+        })
+      }
+
+      this.database.on('remote-cores-downloaded', () => {
+        this.emit('remote-cores-downloaded')
+      })
+
+      this.database.on('peer-connected', (peer) => {
+        if(!this.peers.has(peer.peerPubKey)) {
+          this.emit('peer-connected', peer)
+          this.peers.add(peer.peerPubKey)
+        }
+      })
+
+      this.database.on('peer-disconnected', (peer) => {
+        if(this.peers.has(peer.peerPubKey)) {
+          this.emit('peer-disconnected', peer)
+          this.peers.delete(peer.peerPubKey)
+        }
       })
     }
 
-    this.database.on('remote-cores-downloaded', () => {
-      this.emit('remote-cores-downloaded')
-    })
-
-    this.database.on('peer-connected', (peer) => {
-      if(!this.peers.has(peer.peerPubKey)) {
-        this.emit('peer-connected', peer)
-        this.peers.add(peer.peerPubKey)
-      }
-    })
-
-    this.database.on('peer-disconnected', (peer) => {
-      if(this.peers.has(peer.peerPubKey)) {
-        this.emit('peer-disconnected', peer)
-        this.peers.delete(peer.peerPubKey)
-      }
-    })
-
     await this.database.ready()
-
     this.db = this.database
     this.metadb = this.database.metadb
-    this.metaAutobee = this.database.metaAutobee
   }
 
   async _update(data) {
-    this.emit('sync', data.value)
+    this.emit('sync', data)
 
     const fileHash = await this._localHB.get(data.value.path)
 
     if (
-      !data.value.deleted &&
-      data.value.peer_key !== this.keyPair.publicKey.toString('hex') &&
+      data.type !== 'del' &&
+      data.value.peer !== this.keyPair.publicKey.toString('hex') &&
       !fileHash
     ) {
 
@@ -883,8 +825,8 @@ class Drive extends EventEmitter {
       }
     }
 
-    if (data.value.deleted &&
-      data.value.peer_key !== this.keyPair.publicKey.toString('hex')) {
+    if (data.type === 'del' &&
+      data.value.peer !== this.keyPair.publicKey.toString('hex')) {
       try {
         let filePath = path.join(this._filesDir, `${data.value.path}`)
         
@@ -910,25 +852,6 @@ class Drive extends EventEmitter {
     }
   }
 
-  async _getPrevVal(map) {
-    for (let [key, value] of map) {
-      try {
-        const data = await this.database.autobee.autobase.view.get(value)
-        const op = HyperbeeMessages.Node.decode(data)
-        
-        if(!op || !op.value || !op.key.toString('hex')) continue
-
-        const val = BSON.deserialize(op.value)
-
-        if(val && val.version !== "1.0") {
-          return val
-        }
-      } catch(err) {
-        // womp womp
-      }
-    }
-  }
-
   // Deprecated
   info() {
     const bytes = getTotalSize(this.drivePath)
@@ -945,6 +868,8 @@ class Drive extends EventEmitter {
    * Close drive and disconnect from all Hyperswarm topics
    */
   async close() {
+    this.opened = false
+
     if(this.joinSwarm) {
       await this._swarm.close()
     }
@@ -975,11 +900,10 @@ class Drive extends EventEmitter {
       this.emit('network-updated', this.network)
     }
 
-    this.removeAllListeners()
-    this.requestQueue.removeAllListeners()
-    this._swarm.removeAllListeners()
 
-    this.opened = false
+    // this.removeAllListeners()
+    // this.requestQueue.removeAllListeners()
+    // this._swarm.removeAllListeners()
   }
 }
 
