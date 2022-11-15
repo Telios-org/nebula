@@ -18,13 +18,21 @@
 
   await base.close()
 
-  await base.ready()
+  const base2 = new Autobase({
+    inputs,
+    localInput: firstUser,
+    localOutput: firstOutput
+  })
 
-  await base.append(Buffer.from('foo')) // This breaks
+  await base2.ready()
 
-  await base.close()
+  await base2.append(Buffer.from('foo')) // This breaks
 
-  await base.ready()
+  console.log('DONE')
+
+  // await base.close()
+
+  // await base.ready()
 
   // const val = await autobee.get(Buffer.from('hello'))
   // console.log(val)

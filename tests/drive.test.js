@@ -161,6 +161,7 @@ const encryptionKey = Buffer.alloc(32, 'hello world')
 //       keyPair: DHT.keyPair(),
 //       checkNetworkStatus: true,
 //       fullTextSearch: true,
+//       broadcast: true,
 //       encryptionKey: encKey,
 //       swarmOpts: {
 //         server: true,
@@ -174,6 +175,7 @@ const encryptionKey = Buffer.alloc(32, 'hello world')
 //       keyPair: DHT.keyPair(),
 //       checkNetworkStatus: true,
 //       fullTextSearch: true,
+//       broadcast: true,
 //       encryptionKey: encKey,
 //       swarmOpts: {
 //         server: true,
@@ -227,262 +229,126 @@ const encryptionKey = Buffer.alloc(32, 'hello world')
 //   }
 // })
 
-test('Drive - Sync Remote Database Updates from blind peer', async t => {
-  t.plan(3)
-  await peerCleanup()
-  try {
-    const encKey = Buffer.alloc(32, 'hello world')
-
-    const peer1 = new Drive(__dirname + '/peer1', null, {
-      keyPair: DHT.keyPair(),
-      checkNetworkStatus: true,
-      fullTextSearch: true,
-      encryptionKey: encKey,
-      swarmOpts: {
-        server: true,
-        client: true
-      }
-    })
-
-    peer1.on('addPeer', data => {
-      console.log('PEER1 ADD', data)
-    })
-    await peer1.ready()
-
-    const readStream = fs.createReadStream(path.join(__dirname, '/data/test.doc'))
-    const file = await peer1.writeFile('/test.doc', readStream)
-
-    const collection1 = await peer1.db.collection('example')
-    await collection1.insert({ foo: 'bar' })
-
-    console.log('PEER1 PUBKEY', peer1.database.keyPair.publicKey.toString('hex'))
-
-    // BLIND PEER DOES NOT HAVE ENCRYPTION KEY
-    const peer2 = new Drive(__dirname + '/peer2', peer1.publicKey, {
-      keyPair: DHT.keyPair(),
-      blind: true,
-      syncFiles: false,
-      includeFiles: ['/test.doc'],
-      swarmOpts: {
-        server: true,
-        client: true
-      }
-    })
-    // peer2.on('addPeer', data => {
-    //   console.log('PEER2 ADD', data)
-    // })
-
-    // await peer2.ready()
-    // console.log('PEER2 PUBKEY', peer2.database.keyPair.publicKey.toString('hex'))
-
-    // Sync remote updates from offline peer1 via blind peer2
-    const peer3 = new Drive(__dirname + '/peer3', peer1.publicKey, {
-      keyPair: DHT.keyPair(),
-      encryptionKey: encKey,
-      swarmOpts: {
-        server: true,
-        client: true
-      }
-    })
-
-    // peer3.on('addPeer', data => {
-    //   console.log('PEER3 ADD', data)
-    // })
-
-    // setTimeout(async () => {
-      // const readStream = fs.createReadStream(path.join(__dirname, '/data/test.doc'))
-      // const file = await peer1.writeFile('/test.doc', readStream)
-
-      // const collection1 = await peer1.db.collection('example')
-      // await collection1.insert({ foo: 'bar' })
-    // }, 3000)
-
-    // Test that peer2 syncs includeFiles
-    await peer1.close()
-    console.log('peer1 close')
-    // await peer3.ready()
-    // console.log('PEER3 PUBKEY', peer3.database.keyPair.publicKey.toString('hex'))
-    // console.log('peer3 ready')
-    // await peer3.close()
-    // console.log('peer3 ready')
-    await peer1.ready()
-    console.log('peer1 ready')
-
-    // await peer2.close()
-    // console.log('peer2 close')
-
-    // await peer2.ready()
-    // console.log('peer2 ready')
-
-    setTimeout(async () => {
-      const pubKey = 'a357664ebd9506f7343e8829b545c700f4c16ebbbda5b938910cff6791ba9f12'
-      await peer1.database.metadb.insert({
-        blacklisted: false,
-        peerPubKey: 'a357664ebd9506f7343e8829b545c700f4c16ebbbda5b938910cff6791ba9f12',
-        blind: true,
-        cores: {
-          writer: null,
-          meta: 'aaaaaa5575aa859854c19d48257942bde5cff2fbd0941468a51a3f70fdbf090c'
-        }
-      })
-
-      console.log('INSERTED RECORD')
-
-      // setInterval(async () => {
-      //   const docs = await peer1.database.metadb.find()
-      //   for(const doc of docs) {
-      //     if(doc.peerPubKey === pubKey) {
-      //       console.log(doc)
-      //     }
-      //   }
-      // }, 1000)
-    }, 8000)
-
-
-    // console.log('PEER3 PUBKEY', peer3.database.keyPair.publicKey.toString('hex'))
-    // console.log('peer3 ready')
-
-    // peer2.on('file-sync', async file => {
-    //   console.log('FILE SYNC')
-    //   await peer1.close()
-    //   console.log('peer1 close')
-    //   await peer3.ready()
-    //   console.log('PEER3 PUBKEY', peer3.database.keyPair.publicKey.toString('hex'))
-    //   console.log('peer3 ready')
-
-    //   t.equals(file.path, '/test.doc', 'peer 2 synced includeFiles')
-    // })
-
-    // peer3.on('collection-update', async data => {
-    //   if(data.value.foo) {
-    //     t.ok(data.value.foo, 'peer 3 has value foo')
-
-    //     try {
-    //       const collection2 = await peer3.db.collection('example')
-    //       await collection2.insert({ hello: 'world' })
-          
-    //       await peer3.close()
-    //       console.log('peer 3 close')
-    //       await peer1.ready()
-    //       console.log('peer 1 ready')
-    //       peer1.on('collection-update', async data => {
-    //         console.log('PEER1 GOT DATA', data)
-    //         // if(data.value.hello) {
-    //         //   const col = await peer1.db.collection('example')
-    //         //   const docs = await col.find(data.value)
-    //         //   t.equals(docs[0].hello, 'world', 'peer 1 retrieved update from peer3')
-    //         // }
-    //       })
-    //     } catch(err) {
-    //       //console.log('ERRR', err)
-    //     }
-    //   }
-    // })
-
-    
-
-    t.teardown(async () => {
-      try {
-        console.log('Begin closing cores...')
-        await closeCores([peer1, peer2])
-        await peerCleanup()
-      } catch(err) {
-        console.log(err)
-      }
-    })
-  } catch(err) {
-    console.log(err)
-  }
-})
-
-test('Drive - Sync Remote Database Updates', async t => {
-  t.plan(4)
-
-  try {
-    const encKey = Buffer.alloc(32, 'hello world')
-
-    const peer1 = new Drive(__dirname + '/peer1', null, {
-      keyPair: DHT.keyPair(),
-      encryptionKey: encKey,
-      swarmOpts: {
-        server: true,
-        client: true
-      }
-    })
-
-    await peer1.ready()
-
-    const peer2 = new Drive(__dirname + '/peer2', peer1.publicKey, {
-      keyPair: DHT.keyPair(),
-      encryptionKey: encKey,
-      swarmOpts: {
-        server: true,
-        client: true
-      }
-    })
-
-    await peer2.ready()
-
-    const peer3 = new Drive(__dirname + '/peer3', peer1.publicKey, {
-      keyPair: DHT.keyPair(),
-      encryptionKey: encKey,
-      swarmOpts: {
-        server: true,
-        client: true
-      }
-    })
-
-    peer1.on('collection-update', async data => {
-      if(data.value.hello) {
-        t.ok(data.value.hello, 'peer 1 has value hello')
-      }
-    })
-
-    peer2.on('collection-update', data => {
-      if(data.value.foo) {
-        t.ok(data.value.foo, 'peer 2 has value foo')
-      }
-
-      if(data.value.hello) {
-        t.ok(data.value.hello, 'peer 2 has value hello')
-      }
-    })
-
-    peer3.on('collection-update', async data => {
-      if(data.value.foo) {
-        t.ok(data.value.foo, 'peer 3 has value foo')
-      }
-    })
-
-    await peer3.ready()
-
-    const collection1 = await peer1.db.collection('example')
-    await collection1.insert({ foo: 'bar' })
-
-    const collection3 = await peer3.db.collection('example')
-    await collection3.insert({ hello: 'world' })
-
-    t.teardown(async () => {
-      try {
-        await closeCores([peer1, peer2, peer3])
-        await peerCleanup()
-      } catch(err) {
-        t.fail(err)
-      }
-    })
-  } catch(err) {
-    t.fail(err)
-  }
-})
-
-// test('Drive - Remove remote peer', async t => {
+// test('Drive - Sync Remote Database Updates from blind peer', async t => {
 //   t.plan(2)
+//   await peerCleanup()
+//   try {
+//     const encKey = Buffer.alloc(32, 'hello world')
+//     const p1KP = DHT.keyPair()
+//     let peer1 = new Drive(__dirname + '/peer1', null, {
+//       keyPair: p1KP,
+//       checkNetworkStatus: true,
+//       fullTextSearch: true,
+//       broadcast: true,
+//       encryptionKey: encKey,
+//       swarmOpts: {
+//         server: true,
+//         client: true
+//       }
+//     })
+
+//     await peer1.ready()
+
+//     const readStream = fs.createReadStream(path.join(__dirname, '/data/test.doc'))
+//     const file = await peer1.writeFile('/test.doc', readStream)
+
+//     const collection1 = await peer1.db.collection('example')
+//     await collection1.insert({ foo: 'bar' })
+
+//     // BLIND PEER DOES NOT HAVE ENCRYPTION KEY
+//     const peer2 = new Drive(__dirname + '/peer2', peer1.publicKey, {
+//       keyPair: DHT.keyPair(),
+//       blind: true,
+//       syncFiles: false,
+//       broadcast: true,
+//       includeFiles: ['/test.doc'],
+//       swarmOpts: {
+//         server: true,
+//         client: true
+//       }
+//     })
+    
+//     peer2.on('file-sync', async file => {
+//       t.equals(file.path, '/test.doc', 'peer 2 synced includeFiles')
+//     })
+
+//     await peer2.ready()
+
+//     // Sync remote updates from offline peer1 via blind peer2
+//     const peer3 = new Drive(__dirname + '/peer3', peer1.publicKey, {
+//       keyPair: DHT.keyPair(),
+//       encryptionKey: encKey,
+//       broadcast: true,
+//       swarmOpts: {
+//         server: true,
+//         client: true
+//       }
+//     })
+
+//     await peer1.close()
+//     await peer3.ready()
+
+//     const collection2 = await peer3.db.collection('example')
+//     await collection2.insert({ hello: 'world' })
+    
+//     setTimeout(async () => {
+//       await peer3.close()
+
+//       peer1 = new Drive(__dirname + '/peer1', null, {
+//         keyPair: p1KP,
+//         checkNetworkStatus: true,
+//         fullTextSearch: true,
+//         broadcast: true,
+//         encryptionKey: encKey,
+//         swarmOpts: {
+//           server: true,
+//           client: true
+//         }
+//       })
+
+//       peer1.on('collection-update', async data => {
+//         if(data.value.hello) {
+//           const col = await peer1.db.collection('example')
+//           const docs = await col.find(data.value)
+//           t.equals(docs[0].hello, 'world', 'peer 1 retrieved update from peer3')
+//         }
+//       })
+
+//       await peer1.ready()
+      
+//     }, 3000)
+
+//     async function pause(ms) {
+//       return new Promise((res, rej) => {
+//         setTimeout(() => {
+//           return res()
+//         }, ms)
+//       })
+//     }
+
+//     t.teardown(async () => {
+//       try {
+//         await closeCores([peer1, peer2])
+//         await peerCleanup()
+//       } catch(err) {
+//         console.log(err)
+//       }
+//     })
+//   } catch(err) {
+//     console.log(err)
+//   }
+// })
+
+// test('Drive - Sync Remote Database Updates', async t => {
+//   t.plan(4)
+//   await peerCleanup()
 //   try {
 //     const encKey = Buffer.alloc(32, 'hello world')
 
 //     const peer1 = new Drive(__dirname + '/peer1', null, {
 //       keyPair: DHT.keyPair(),
 //       encryptionKey: encKey,
+//       broadcast: true,
 //       swarmOpts: {
 //         server: true,
 //         client: true
@@ -494,6 +360,7 @@ test('Drive - Sync Remote Database Updates', async t => {
 //     const peer2 = new Drive(__dirname + '/peer2', peer1.publicKey, {
 //       keyPair: DHT.keyPair(),
 //       encryptionKey: encKey,
+//       broadcast: true,
 //       swarmOpts: {
 //         server: true,
 //         client: true
@@ -505,76 +372,160 @@ test('Drive - Sync Remote Database Updates', async t => {
 //     const peer3 = new Drive(__dirname + '/peer3', peer1.publicKey, {
 //       keyPair: DHT.keyPair(),
 //       encryptionKey: encKey,
+//       broadcast: true,
 //       swarmOpts: {
 //         server: true,
 //         client: true
+//       }
+//     })
+
+
+//     peer1.on('collection-update', async data => {
+//       if(data.value.hello) {
+//         t.ok(data.value.hello, 'peer 1 has value hello')
+//       }
+//     })
+
+//     peer2.on('collection-update', data => {
+//       if(data.value.foo) {
+//         t.ok(data.value.foo, 'peer 2 has value foo')
+//       }
+
+//       if(data.value.hello) {
+//         t.ok(data.value.hello, 'peer 2 has value hello')
+//       }
+//     })
+
+//     peer3.on('collection-update', async data => {
+//       if(data.value.foo && data.type === 'create') {
+//         t.ok(data.value.foo, 'peer 3 has value foo')
 //       }
 //     })
 
 //     await peer3.ready()
 
+//     pause(2000)
+    
 //     const collection1 = await peer1.db.collection('example')
 //     await collection1.insert({ foo: 'bar' })
 
-//     const collection2 = await peer2.db.collection('example')
-//     await collection2.insert({ bar: 'foo' })
+//     pause(2000)
 
 //     const collection3 = await peer3.db.collection('example')
 //     await collection3.insert({ hello: 'world' })
-    
-//     const peer4 = new Drive(__dirname + '/peer4', peer1.publicKey, {
-//       keyPair: DHT.keyPair(),
-//       encryptionKey: encKey,
-//       swarmOpts: {
-//         server: true,
-//         client: true
-//       }
-//     })
-
-//     peer4.on('collection-update', async data => {
-//       if(data.value.baz) {
-//         t.fail('Should not sync data from removed peer!')
-//       }
-
-//       if(data.value.foo) {
-//         t.ok(data.value.foo, 'peer 4 has value foo')
-//       }
-
-//       if(data.value.hello) {
-//         t.ok(data.value.hello, 'peer 4 has value hello')
-//       }
-//     })
-
-//     peer1.on('collection-update', async data => {
-//       if(data.value.hello === 'world') {
-//         await peer1.removePeer({
-//           blind: peer2.blind,
-//           publicKey: peer2.publicKey,
-//           writer: peer2.peerWriterKey, 
-//           meta: peer2.publicKey
-//         })
-
-//         await peer4.ready()
-
-//         // setTimeout(async () => {
-//         //   await collection2.insert({ baz: 'foo' })
-//         // }, 10000)
-//       }
-//     })
 
 //     t.teardown(async () => {
 //       try {
-//         console.log('TEARDOWN!')
-//         await closeCores([peer1, peer2, peer3, peer4])
+//         await closeCores([peer1, peer2, peer3])
 //         await peerCleanup()
 //       } catch(err) {
-//         console.log(err)
+//         t.fail(err)
 //       }
 //     })
 //   } catch(err) {
-//     console.log(err)
+//     t.fail(err)
 //   }
 // })
+
+test('Drive - Remove remote peer', async t => {
+  t.plan(1)
+  try {
+    await peerCleanup()
+
+    const encKey = Buffer.alloc(32, 'hello world')
+
+    const peer1 = new Drive(__dirname + '/peer1', null, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      broadcast: true,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    peer1.on('collection-update', async data => {
+      if(data.value.baz) {
+        t.fail('Should not sync data from removed peer!')
+      }
+    })
+    await peer1.ready()
+    const p2Kp = DHT.keyPair()
+    let peer2 = new Drive(__dirname + '/peer2', peer1.publicKey, {
+      keyPair: p2Kp,
+      encryptionKey: encKey,
+      broadcast: true,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    await peer2.ready()
+
+    const collection2 = await peer2.db.collection('example')
+
+    const peer3 = new Drive(__dirname + '/peer3', peer1.publicKey, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      broadcast: true,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    peer3.on('collection-update', async data => {
+      if(data.value.baz) {
+        t.fail('Should not sync data from removed peer!')
+      }
+    })
+    await peer3.ready()
+    
+    const peer4 = new Drive(__dirname + '/peer4', peer1.publicKey, {
+      keyPair: DHT.keyPair(),
+      encryptionKey: encKey,
+      broadcast: true,
+      swarmOpts: {
+        server: true,
+        client: true
+      }
+    })
+
+    peer4.on('collection-update', async data => {
+      if(data.value.baz) {
+        t.fail('Should not sync data from removed peer!')
+      }
+    })
+
+    await peer4.ready()
+
+    pause(2000)
+
+    await peer1.removePeer({
+      blind: peer2.blind,
+      publicKey: peer2.keyPair.publicKey.toString('hex'),
+      writer: peer2.peerWriterKey, 
+      meta: peer2.publicKey
+    })
+
+    setTimeout(async () => {
+      await collection2.insert({ baz: 'foo' })
+      t.ok()
+    }, 10000)
+
+    t.teardown(async () => {
+      try {
+        await closeCores([peer1, peer2, peer3, peer4])
+        await peerCleanup()
+      } catch(err) {
+        console.log(err)
+      }
+    })
+  } catch(err) {
+    console.log(err)
+  }
+})
 
 test('Drive - Create Seed Peer with Max Storage of 12mb', async t => {
   t.plan(4)
@@ -828,4 +779,12 @@ async function closeCores(cores) {
   }
 
   return Promise.all(promises)
+}
+
+async function pause(ms) {
+  return new Promise((res, rej) => {
+    setTimeout(() => {
+      res()
+    }, ms)
+  })
 }

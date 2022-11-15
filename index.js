@@ -195,12 +195,8 @@ class Drive extends EventEmitter {
       this._collections.files.createIndex(['path'])
     }
 
-    this.database.on('buildNode', data => {
-      this.emit('buildNode', data)
-    })
-
-    this.database.on('addPeer', data => {
-      this.emit('addPeer', data)
+    this.database.on('debug', data => {
+      this.emit('debug', data)
     })
 
     this.database.on('collection-update', async data => {
@@ -267,6 +263,7 @@ class Drive extends EventEmitter {
         //     }
         //   }
         // }
+
 
         socket.write(JSON.stringify({
           type: 'sync',
@@ -351,10 +348,10 @@ class Drive extends EventEmitter {
   }
 
   async addPeer(peer) {
-    
     try {
       const doc = await this.database.metadb.findOne({ peerPubKey: peer.peerPubKey })
     } catch(err) {
+      
       await this.database.metadb.insert({ 
         blacklisted: false,
         peerPubKey: peer.peerPubKey,
@@ -371,9 +368,14 @@ class Drive extends EventEmitter {
 
   // Remove Peer
   async removePeer(peer) {
-    //if(this.opened) {
-      await this.database.metadb.delete({ peerPubKey: peer.publicKey })
-    //}
+    await this.database.removeRemotePeer({
+      peerPubKey: peer.publicKey,
+      blind: peer.blind,
+      writer: peer.writer,
+      meta: peer.meta
+     })
+
+   await this.database.metadb.update({ peerPubKey: peer.publicKey }, { blacklisted: true })
   }
 
   async writeFile(path, readStream, opts = {}) {
@@ -733,64 +735,63 @@ class Drive extends EventEmitter {
     this._localHB = new Hyperbee(this._localCore, { keyEncoding: 'utf8', valueEncoding: 'json' })
     this._localDB = new FileDB(`${this.drivePath}/LocalDS`)
     
-    if(!this.database) {
-      this.database = new Database(this.storage || this.drivePath, {
-        localDB: this._localDB,
-        keyPair: this.keyPair,
-        storageName: this.storageName,
-        encryptionKey: this.encryptionKey,
-        peerPubKey: this.peerPubKey,
-        acl: this.swarmOpts && this.swarmOpts.acl ? this.swarmOpts.acl : null,
-        joinSwarm: this.joinSwarm,
-        fts: this.fullTextSearch,
-        blind: this.blind,
-        stat: this._stat,
-        storageMaxBytes: this.storageMaxBytes,
-        fileStatPath: this._fileStatPath,
-        broadcast: this.broadcast
-      })
-      
+    this.database = new Database(this.storage || this.drivePath, {
+      localDB: this._localDB,
+      keyPair: this.keyPair,
+      storageName: this.storageName,
+      encryptionKey: this.encryptionKey,
+      peerPubKey: this.peerPubKey,
+      acl: this.swarmOpts && this.swarmOpts.acl ? this.swarmOpts.acl : null,
+      joinSwarm: this.joinSwarm,
+      fts: this.fullTextSearch,
+      blind: this.blind,
+      stat: this._stat,
+      storageMaxBytes: this.storageMaxBytes,
+      fileStatPath: this._fileStatPath,
+      broadcast: this.broadcast
+    })
+    
+    this.database.on('disconnected', () => {
+      if(this.network.drive) {
+        this.network.drive = false
+        this.emit('network-updated', { drive: this.network.drive })
+      }
+    })
+
+    this.database.on('connected', () => {
+      if(!this.network.drive) {
+        this.network.drive = true
+        this.emit('network-updated', { drive: this.network.drive })
+      }
+    })
+
+    if(this.checkNetworkStatus) {
       this.database.on('disconnected', () => {
         if(this.network.drive) {
           this.network.drive = false
           this.emit('network-updated', { drive: this.network.drive })
         }
       })
-
-      this.database.on('connected', () => {
-        if(!this.network.drive) {
-          this.network.drive = true
-          this.emit('network-updated', { drive: this.network.drive })
-        }
-      })
-
-      if(this.checkNetworkStatus) {
-        this.database.on('disconnected', () => {
-          if(this.network.drive) {
-            this.network.drive = false
-            this.emit('network-updated', { drive: this.network.drive })
-          }
-        })
-      }
-
-      this.database.on('remote-cores-downloaded', () => {
-        this.emit('remote-cores-downloaded')
-      })
-
-      this.database.on('peer-connected', (peer) => {
-        if(!this.peers.has(peer.peerPubKey)) {
-          this.emit('peer-connected', peer)
-          this.peers.add(peer.peerPubKey)
-        }
-      })
-
-      this.database.on('peer-disconnected', (peer) => {
-        if(this.peers.has(peer.peerPubKey)) {
-          this.emit('peer-disconnected', peer)
-          this.peers.delete(peer.peerPubKey)
-        }
-      })
     }
+
+    this.database.on('remote-cores-downloaded', () => {
+      this.emit('remote-cores-downloaded')
+    })
+
+    this.database.on('peer-connected', (peer) => {
+      if(!this.peers.has(peer.peerPubKey)) {
+        this.emit('peer-connected', peer)
+        this.peers.add(peer.peerPubKey)
+      }
+    })
+
+    this.database.on('peer-disconnected', (peer) => {
+      if(this.peers.has(peer.peerPubKey)) {
+        this.emit('peer-disconnected', peer)
+        this.peers.delete(peer.peerPubKey)
+      }
+    })
+  
 
     await this.database.ready()
     this.db = this.database
@@ -880,6 +881,8 @@ class Drive extends EventEmitter {
 
     await this.database.close()
 
+    this.database = null
+
     clearInterval(this._checkInternetInt)
 
     this.network = {
@@ -901,9 +904,9 @@ class Drive extends EventEmitter {
     }
 
 
-    // this.removeAllListeners()
-    // this.requestQueue.removeAllListeners()
-    // this._swarm.removeAllListeners()
+    this.removeAllListeners()
+    this.requestQueue.removeAllListeners()
+    this._swarm.removeAllListeners()
   }
 }
 

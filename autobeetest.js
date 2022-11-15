@@ -19,34 +19,55 @@
 
       this.inputs = [this.firstUser]
 
-      this.base = new Autobase({
+      const base = new Autobase({
         inputs: this.inputs,
         localInput: this.firstUser,
         localOutput: this.firstOutput
       })
 
-      this.bee = new Autodeebee(this.base)
+      this.bee = new Autodeebee(base)
     }
 
     async ready() {
-      // this.db = new DB(this.bee)
+      await this.firstUser.ready()
+      await this.firstOutput.ready()
 
-
-        
-        await this.firstUser.ready()
-        await this.firstOutput.ready()
-      
-
-      // await _joinSwarm(this.firstUser, { server: true, client: true })
-      // await _joinSwarm(this.firstOutput, { server: true, client: true })
-
+      console.log('GOT HERE 1')
       await this.bee.ready()
+      console.log('GOT HERE 2')
+
+      this.db = new DB(this.bee)
+    }
+
+    async addInput(core) {
+      await this.bee.addInput(core)
     }
 
     async close() {
-      await this.firstUser.close()
-      await this.firstOutput.close()
       await this.bee.close()
+
+      // for (const session of this.firstUser.sessions) {
+      //   if(session) {
+      //     await session.close()
+      //   }
+      // }
+
+      for (const session of this.firstOutput.sessions) {
+        if(session) {
+          await session.close()
+        }
+      }
+
+      try {
+        if(this.firstOutput.sessions.length)
+          await this.firstOutput.sessions[0].close()
+      console.log(this.firstOutput.sessions)
+      } catch(er){
+        console.log(er)
+      }
+
+      // this.db = null
+      // this.bee = null
     }
   }
 
@@ -81,44 +102,40 @@
   try {
     let bee = new Bee()
     await bee.ready()
-    let db = bee.bee
+    let db = bee.db
 
-    // const collection = db.collection('documents')
-    // await collection.createIndex(['example'])
-    // const doc = await collection.insert({ example: 'Hello World!' })
+    let collection = db.collection('documents')
+    await collection.createIndex(['example'])
+    const doc = await collection.insert({ example: 'Hello World!' })
 
-    // await collection.createIndex(['example'])
+    await collection.createIndex(['example'])
 
-    // console.log('doc', doc)
-    // const otherDoc = await collection.findOne({ _id: doc._id })
-    // console.log('otherDoc', otherDoc)
+    console.log('doc', doc)
+    const otherDoc = await collection.findOne({ _id: doc._id })
+    console.log('otherDoc', otherDoc)
 
-    await db.put('foo', 'bar')
+    const t3 = new Hypercore('./t3', null, { encryptionKey: encKey })
 
-    const val = await db.get(Buffer.from('foo'))
-    console.log(val)
+    await bee.addInput(t3)
 
     await bee.close()
     console.log('close')
 
-    await bee.ready()
+    let bee2 = new Bee()
+    await bee2.ready()
+    db2 = bee2.db
     console.log('ready')
 
-    await db.put('foo', 'test')
+    const collection2 = db2.collection('documents')
+    await collection2.createIndex(['example'])
+    let doc2 = await collection2.insert({ example: 'Hello Worlderadfasdfasfasfd!' })
+    console.log(doc2)
 
-    // const collection2 = db.collection('documents')
-    // await collection2.createIndex(['example'])
-    // const doc2 = await collection2.insert({ example: 'Hello World!' })
-    // console.log(doc2)
-
-
-    await bee.close()
+    await bee2.close()
     console.log('close')
-    await bee.ready()
-    console.log('ready')
-    await bee.close()
-    console.log('close')
-    await bee.ready()
+
+    const bee3 = new Bee()
+    await bee3.ready()
     console.log('ready')
     
   } catch(err) {
