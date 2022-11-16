@@ -395,15 +395,23 @@ class Drive extends EventEmitter {
 
         await this.database._updateStatBytes(file.size)
 
-        await this.metadb.insert({
-          uuid,
-          size: file.size,
-          hash: file.hash,
-          path: `/${uuid}`,
-          peer: this.keyPair.publicKey.toString('hex'),
-          discovery_key: this.discoveryKey,
-          custom_data: opts.customData
-        })
+        await this.metadb.update(
+          { 
+            path: `/${uuid}` 
+          },
+          {
+            uuid,
+            size: file.size,
+            hash: file.hash,
+            path: `/${uuid}`,
+            peer: this.keyPair.publicKey.toString('hex'),
+            discovery_key: this.discoveryKey,
+            custom_data: opts.customData
+          },
+          {
+            upsert: true
+          }
+        )
 
         const fileMeta = {
           uuid,
@@ -420,7 +428,18 @@ class Drive extends EventEmitter {
           custom_data: opts.customData
         }
 
-        await this._collections.files.insert({ ...fileMeta, updatedAt: new Date().toISOString() })
+        await this._collections.files.update(
+          {
+            path: filePath
+          },
+          { 
+            ...fileMeta, 
+            updatedAt: new Date().toISOString() 
+          },
+          {
+            upsert: true
+          }
+        )
 
         this.emit('file-add', fileMeta)
 
@@ -450,15 +469,23 @@ class Drive extends EventEmitter {
             if (bytes > 0) {
               await this.database._updateStatBytes(bytes)
 
-              await this.metadb.insert({
-                uuid,
-                size: bytes,
-                hash: _hash,
-                path,
-                peer: this.keyPair.publicKey.toString('hex'),
-                discovery_key: this.discoveryKey,
-                custom_data: opts.customData
-              })
+              await this.metadb.update(
+                {
+                  path
+                },
+                {
+                  uuid,
+                  size: bytes,
+                  hash: _hash,
+                  path,
+                  peer: this.keyPair.publicKey.toString('hex'),
+                  discovery_key: this.discoveryKey,
+                  custom_data: opts.customData
+                },
+                {
+                  upsert: true
+                }
+              )
 
               const fileMeta = {
                 uuid,
@@ -472,7 +499,18 @@ class Drive extends EventEmitter {
                 custom_data: opts.customData
               }
 
-              await this._collections.files.insert({ ...fileMeta, updatedAt: new Date().toISOString() })
+              await this._collections.files.update(
+                {
+                  path: filePath
+                },
+                { 
+                  ...fileMeta, 
+                  updatedAt: new Date().toISOString() 
+                },
+                {
+                  upsert: true
+                }
+              )
 
               this.emit('file-add', fileMeta)
               resolve(fileMeta)
