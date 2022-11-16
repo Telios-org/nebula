@@ -27,6 +27,7 @@
     "corestore": "^6.2.0",
     "dat-encoding": "^5.0.1",
     "data-store": "^4.0.3",
+    "debounce": "^1.2.1",
     "graceful-fs": "^4.2.9",
     "hyperbee": "^2.1.2",
     "hyperbeedeebee": "git+https://github.com/Jampard/hyperdeebee.git",

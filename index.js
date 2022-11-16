@@ -157,9 +157,14 @@ class Drive extends EventEmitter {
 
     if(uncaughtCount === 0) {
       process.on('uncaughtException', (err) => {
-        //throw err
-        if(err.message.indexOf('PEER_NOT_FOUND') === -1 && err.message.indexOf('connection reset') === -1 && err.message.indexOf('PeerDiscovery') === -1)
-          console.log(err)
+        if(
+          err.message.indexOf('PEER_NOT_FOUND') === -1 && 
+          err.message.indexOf('PeerDiscovery') === -1 &&
+          err.message.indexOf('connection reset') === -1 &&
+          err.message.indexOf('Linearization') === -1
+        ) {
+          console.log('=>', err)
+        }
       })
     }
 
@@ -242,29 +247,6 @@ class Drive extends EventEmitter {
 
     this._swarm.on('peer-connected', async socket => {
       if(this.broadcast) {
-        // const cores = []
-        // const metaStream = this.database.metaAutobee.createReadStream()
-
-        // for await(const data of metaStream) {          
-        //   if(data && data.value && data.value.toString().indexOf('hyperbee') === -1) {
-        //     const node = BSON.deserialize(data.value)
-            
-        //     if(node.cores) {
-        //       socket.write(JSON.stringify({
-        //         type: 'sync',
-        //         meta: {
-        //           drivePubKey: this.peerPubKey || this.publicKey,
-        //           peerPubKey: node.peerPubKey,
-        //           blind: node.blind,
-        //           writer: node.cores.writer,
-        //           meta: node.cores.meta
-        //         }
-        //       }))
-        //     }
-        //   }
-        // }
-
-
         socket.write(JSON.stringify({
           type: 'sync',
           meta: {
@@ -612,9 +594,9 @@ class Drive extends EventEmitter {
   }
 
   async _initFileSwarm(stream, topic, fileHash, attempts, { keyPair }) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       if(!this.opened) throw ('Drive is closed.')
-
+      
       if (attempts > this.fileRetryAttempts) {
         const err = new Error('Unable to make a connection or receive data within the allotted time.')
         err.fileHash = fileHash
@@ -902,7 +884,6 @@ class Drive extends EventEmitter {
 
       this.emit('network-updated', this.network)
     }
-
 
     this.removeAllListeners()
     this.requestQueue.removeAllListeners()
