@@ -250,6 +250,7 @@ class Drive extends EventEmitter {
         socket.write(JSON.stringify({
           type: 'sync',
           meta: {
+            version: '2.0',
             drivePubKey: this.peerPubKey || this.publicKey,
             peerPubKey: this.keyPair.publicKey.toString('hex'),
             blind: this.blind,
@@ -333,18 +334,20 @@ class Drive extends EventEmitter {
     try {
       const doc = await this.database.metadb.findOne({ peerPubKey: peer.peerPubKey })
     } catch(err) {
-      
-      await this.database.metadb.insert({ 
-        blacklisted: false,
-        peerPubKey: peer.peerPubKey,
-        blind: peer.blind,
-        cores: {
-          writer: peer.writer,
-          meta: peer.meta
-        }
-      })
+      if(peer.version === '2.0') {
+        await this.database.metadb.insert({
+          version: '2.0',
+          blacklisted: false,
+          peerPubKey: peer.peerPubKey,
+          blind: peer.blind,
+          cores: {
+            writer: peer.writer,
+            meta: peer.meta
+          }
+        })
 
-      await this.database.addRemotePeer(peer)
+        await this.database.addRemotePeer(peer)
+      }
     }
   }
 
