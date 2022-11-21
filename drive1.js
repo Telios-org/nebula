@@ -3,9 +3,14 @@
 
   const encKey = Buffer.alloc(32, 'hello world')
 
+  // 1 - Y
+  // 2 - Y
+  // 4 - Y
+  // 5 - Y
+
   const keyPair = {
-    publicKey: '45ccb55e617351613c35da062aa926b14b839ec4db624244e264ff8fd5e353f7',
-    secretKey: 'cbb8cce4c36387a869dd7b89bfb15694cc3ac612ce1f19dc738a7c00f81b995f45ccb55e617351613c35da062aa926b14b839ec4db624244e264ff8fd5e353f7'
+    publicKey: Buffer.from('20a932724b820709452be98ac4e1f0b551c96892e4a203c51fd57535e6b79422', 'hex'),
+    secretKey: Buffer.from('1d6a752c92d9c0cc4bacb830adcae26650a02c88af53b41565dc0182881552cc20a932724b820709452be98ac4e1f0b551c96892e4a203c51fd57535e6b79422', 'hex')
   }
 
   const peer1 = new Drive(__dirname + '/d1', null, {
@@ -32,12 +37,13 @@
   }})
 
 
-  const collection = await peer1.db.collection('example')
+  // const collection = await peer1.db.collection('example')
 
-  console.log(await collection.find())
+  // console.log(await collection.find())
 
-  // setTimeout(async () => {
-  //   const collection = await peer1.db.collection('example')
-  //   await collection.insert({ hello: 'world' })
-  // }, 2000)
+  setInterval(async () => {
+    const collection = await peer1.db.collection('example')
+    await collection.insert({ hello: 'world' })
+    console.log('inserted')
+  }, 5000)
 })()
