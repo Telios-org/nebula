@@ -959,9 +959,11 @@ class Drive extends EventEmitter {
       this.emit('network-updated', this.network)
     }
 
-    this.removeAllListeners()
-    this.requestQueue.removeAllListeners()
-    this._swarm.removeAllListeners()
+    if(this.joinSwarm) {
+      this.removeAllListeners()
+      this.requestQueue.removeAllListeners()
+      this._swarm.removeAllListeners()
+    }
 
     this.opened = false
   }

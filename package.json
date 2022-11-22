@@ -1,6 +1,6 @@
 {
   "name": "@telios/nebula",
-  "version": "3.4.13",
+  "version": "3.4.14",
   "description": "Real-time distributed file and data storage.",
   "main": "index.js",
   "scripts": {
