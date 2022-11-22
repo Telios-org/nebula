@@ -102,6 +102,7 @@ class Drive extends EventEmitter {
       core_bytes: 0,
       total_bytes: 0
     }
+    this._dbVersion = '2.0'
 
     this.indexCreated = false
 
@@ -250,7 +251,7 @@ class Drive extends EventEmitter {
         socket.write(JSON.stringify({
           type: 'sync',
           meta: {
-            version: '2.0',
+            __version: this._dbVersion,
             drivePubKey: this.peerPubKey || this.publicKey,
             peerPubKey: this.keyPair.publicKey.toString('hex'),
             blind: this.blind,
@@ -334,9 +335,9 @@ class Drive extends EventEmitter {
     try {
       const doc = await this.database.metadb.findOne({ peerPubKey: peer.peerPubKey })
     } catch(err) {
-      if(peer.version === '2.0') {
+      if(peer.__version === this._dbVersion) {
         await this.database.metadb.insert({
-          version: '2.0',
+          __version: this._dbVersion,
           blacklisted: false,
           peerPubKey: peer.peerPubKey,
           blind: peer.blind,
@@ -771,7 +772,8 @@ class Drive extends EventEmitter {
       stat: this._stat,
       storageMaxBytes: this.storageMaxBytes,
       fileStatPath: this._fileStatPath,
-      broadcast: this.broadcast
+      broadcast: this.broadcast,
+      dbVersion: this._dbVersion
     })
     
     this.database.on('disconnected', () => {
@@ -926,9 +928,11 @@ class Drive extends EventEmitter {
       this.emit('network-updated', this.network)
     }
 
-    this.removeAllListeners()
-    this.requestQueue.removeAllListeners()
-    this._swarm.removeAllListeners()
+    if(this.joinSwarm) {
+      this.removeAllListeners()
+      this.requestQueue.removeAllListeners()
+      this._swarm.removeAllListeners()
+    }
   }
 }
 
