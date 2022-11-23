@@ -164,7 +164,7 @@ class Drive extends EventEmitter {
           err.message.indexOf('connection reset') === -1 &&
           err.message.indexOf('Linearization') === -1
         ) {
-          console.log('=>', err)
+          // uncaught error
         }
       })
     }
