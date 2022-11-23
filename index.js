@@ -222,10 +222,6 @@ class Drive extends EventEmitter {
       }
     })
 
-    if (this.keyPair && this.joinSwarm) {
-      await this.connect()
-    }
-
     this.opened = true
   }
 
@@ -933,8 +929,6 @@ class Drive extends EventEmitter {
       this.requestQueue.removeAllListeners()
       this._swarm.removeAllListeners()
     }
-
-    this.opened = false
   }
 }
 
