@@ -192,6 +192,10 @@ class Drive extends EventEmitter {
       this.discoveryKey = createTopicHash(this.publicKey).toString('hex')
     }
 
+    if (this.keyPair && this.joinSwarm) {
+      await this.connect()
+    }
+
     // Data here can only be read by peer drives
     // that are sharing the same drive secret
     if(!this.blind) {
@@ -200,10 +204,6 @@ class Drive extends EventEmitter {
       // This drastically speeds up queries and is necessary for sorting by fields
       this._collections.files.createIndex(['path'])
     }
-
-    this.database.on('debug', data => {
-      this.emit('debug', data)
-    })
 
     this.database.on('collection-update', async data => {
       if(
@@ -933,6 +933,8 @@ class Drive extends EventEmitter {
       this.requestQueue.removeAllListeners()
       this._swarm.removeAllListeners()
     }
+
+    this.opened = false
   }
 }
 
