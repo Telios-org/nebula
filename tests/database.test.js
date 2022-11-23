@@ -146,7 +146,7 @@ test('Database - Full text search', async t => {
     }
  
     setTimeout(async() => {
-      await collection.remove({ title: 'Painting 2' })   
+      await collection.delete({ title: 'Painting 2' })   
 
       const q1 = await collection.search("happy tree")
 
@@ -181,7 +181,7 @@ test('Database - Remove item from hyperbee', async t => {
     
     const collection = await database.collection('foobar')
     const doc = await collection.insert({ foo: 'bar' })
-    await collection.remove({ _id: doc._id })
+    await collection.delete({ _id: doc._id })
 
     const item = await collection.find({ _id: doc._id })
 

@@ -7,8 +7,7 @@
     "test": "cross-env NODE_ENV=test_sdk tape tests/*.test.js | tap-spec",
     "semantic-release": "semantic-release",
     "commit": "cz",
-    "debug": "cross-env NODE_ENV=test_sdk tape tests/drive.test.js | tap-spec --nolazy --debug-brk=5858",
-    "preinstall": "npx force-resolutions --force"
+    "debug": "cross-env NODE_ENV=test_sdk tape tests/drive.test.js | tap-spec --nolazy --debug-brk=5858"
   },
   "repository": {
     "type": "git",
@@ -21,23 +20,24 @@
   },
   "homepage": "https://github.com/Telios-org/nebula",
   "dependencies": {
-    "autobase": "1.0.0-alpha.6",
+    "autobase": "https://github.com/hypercore-protocol/autobase",
     "blakejs": "^1.1.0",
     "codecs": "^2.2.0",
     "concat-stream": "^2.0.0",
-    "corestore": "6.0.1-alpha.9",
+    "corestore": "^6.2.0",
     "dat-encoding": "^5.0.1",
     "data-store": "^4.0.3",
+    "debounce": "^1.2.1",
     "graceful-fs": "^4.2.9",
-    "hyperbee": "1.7.0",
-    "hyperbeedeebee": "git+https://github.com/hexadecible/hyperbeedeebee.git",
-    "hypercore": "10.0.0-alpha.23",
-    "hyperswarm": "3.0.2",
+    "hyperbee": "^2.1.2",
+    "hyperbeedeebee": "git+https://github.com/Telios-org/hyperdeebee.git",
+    "hypercore": "^10.4.1",
+    "hyperswarm": "^4.3.5",
     "is-online": "^9.0.1",
     "memorystream": "^0.3.1",
     "natural": "^5.1.11",
     "pump": "^3.0.0",
-    "random-access-memory": "^3.1.1",
+    "random-access-memory": "^6.0.0",
     "sodium-javascript": "^0.8.0",
     "stopwords": "^0.0.9",
     "uuid": "^8.2.0"
@@ -57,9 +57,6 @@
     "tap-spec": "^2.2.2",
     "tape": "^5.2.2",
     "tape-promise": "^4.0.0"
-  },
-  "resolutions": {
-    "@hyperswarm/dht": "5.0.17"
   },
   "directories": {
     "lib": "lib",
