@@ -39,7 +39,7 @@
     "natural": "^5.1.11",
     "pump": "^3.0.0",
     "random-access-memory": "^6.0.0",
-    "sodium-javascript": "^0.8.0",
+    "sodium-native": "^3.4.1",
     "stopwords": "^0.0.9",
     "uuid": "^8.2.0"
   },
