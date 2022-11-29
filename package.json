@@ -1,6 +1,6 @@
 {
   "name": "@telios/nebula",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Real-time distributed file and data storage.",
   "main": "index.js",
   "scripts": {
@@ -21,6 +21,7 @@
   "homepage": "https://github.com/Telios-org/nebula",
   "dependencies": {
     "autobase": "https://github.com/hypercore-protocol/autobase",
+    "bip39": "^3.0.4",
     "blakejs": "^1.1.0",
     "codecs": "^2.2.0",
     "concat-stream": "^2.0.0",
