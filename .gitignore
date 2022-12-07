@@ -123,3 +123,5 @@ package-lock.json
 yarn.lock
 .DS_Store
 scratch.js
+drive1*
+d1/**/**
