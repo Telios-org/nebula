@@ -1,6 +1,6 @@
 {
   "name": "@telios/nebula",
-  "version": "4.0.6",
+  "version": "4.0.7",
   "description": "Real-time distributed file and data storage.",
   "main": "index.js",
   "scripts": {
@@ -89,8 +89,6 @@
     }
   },
   "overrides": {
-    "hyperswarm": {
-      "@hyperswarm/dht": "5.0.25"
-    }
+    "@hyperswarm/dht": "5.0.25"
   }
 }
