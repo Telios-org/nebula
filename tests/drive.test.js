@@ -281,29 +281,31 @@ test('Drive - Sync Remote Database Updates from blind peer', async t => {
     const collection2 = await peer3.db.collection('example')
     await collection2.insert({ hello: 'world' })
     
-    await peer3.close()
+    setTimeout(async () => {
+      await peer3.close()
 
-    peer1 = new Drive(__dirname + '/peer1', null, {
-      keyPair: p1KP,
-      checkNetworkStatus: true,
-      fullTextSearch: true,
-      broadcast: true,
-      encryptionKey: encKey,
-      swarmOpts: {
-        server: true,
-        client: true
-      }
-    })
+      peer1 = new Drive(__dirname + '/peer1', null, {
+        keyPair: p1KP,
+        checkNetworkStatus: true,
+        fullTextSearch: true,
+        broadcast: true,
+        encryptionKey: encKey,
+        swarmOpts: {
+          server: true,
+          client: true
+        }
+      })
 
-    peer1.on('collection-update', async data => {
-      if(data.value.hello) {
-        const col = await peer1.db.collection('example')
-        const docs = await col.find(data.value)
-        t.equals(docs[0].hello, 'world', 'peer 1 retrieved update from peer3')
-      }
-    })
+      peer1.on('collection-update', async data => {
+        if(data.value.hello) {
+          const col = await peer1.db.collection('example')
+          const docs = await col.find(data.value)
+          t.equals(docs[0].hello, 'world', 'peer 1 retrieved update from peer3')
+        }
+      })
 
-    await peer1.ready()
+      await peer1.ready()
+    }, 3000)
       
     t.teardown(async () => {
       try {
