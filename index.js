@@ -206,6 +206,10 @@ class Drive extends EventEmitter {
     }
 
     this.database.on('collection-update', async data => {
+      if(!data) {
+        this.emit('collection-update')
+      }
+      
       if(
         data.value.author === this.keyPair.publicKey.toString('hex') || 
         data.value.peerPubKey === this.keyPair.publicKey.toString('hex') ||
