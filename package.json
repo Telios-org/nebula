@@ -31,7 +31,7 @@
     "debounce": "^1.2.1",
     "graceful-fs": "^4.2.9",
     "hyperbee": "^2.1.2",
-    "hyperbeedeebee": "git+https://github.com/Telios-org/hyperdeebee.git",
+    "hyperbeedeebee": "git+https://github.com/hexadecible/hyperbeedeebee.git",
     "hypercore": "^10.4.1",
     "hyperswarm": "^4.3.5",
     "is-online": "^9.0.1",
